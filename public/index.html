@@ -60,12 +60,18 @@
                 api.request(`/tasks/${taskId}/applications`, { headers: { 'Authorization': `Bearer ${token}` } }),
             getMyApplications: (token) => 
                 api.request('/applications/my', { headers: { 'Authorization': `Bearer ${token}` } }),
-            approveApplication: (token, id) => 
-                api.request(`/applications/${id}/approve`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
+            acceptApplication: (token, id) => 
+                api.request(`/applications/${id}/accept`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
             rejectApplication: (token, id) => 
                 api.request(`/applications/${id}/reject`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-            rateUser: (token, applicationId, rating, ratedUserId) => 
-                api.request(`/applications/${applicationId}/rate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ rating, ratedUserId }) }),
+            confirmWork: (token, id) => 
+                api.request(`/applications/${id}/confirm-work`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
+            rateWorker: (token, applicationId, rating) => 
+                api.request(`/applications/${applicationId}/rate-worker`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ rating }) }),
+            rateEmployer: (token, applicationId, rating) => 
+                api.request(`/applications/${applicationId}/rate-employer`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ rating }) }),
+            claimPayment: (token, applicationId) => 
+                api.request(`/applications/${applicationId}/claim-payment`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
             addBalance: (token, amount) => 
                 api.request('/balance/add', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ amount }) }),
             withdrawBalance: (token) => 
@@ -75,7 +81,9 @@
             getLeaderboard: () => 
                 api.request('/leaderboard'),
             sendSupport: (token, subject, message) => 
-                api.request('/support', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ subject, message }) })
+                api.request('/support', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ subject, message }) }),
+            donate: (token, amount, category) => 
+                api.request('/charity/donate', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ amount, category }) })
         };
 
         const Icon = ({ name, className = "w-5 h-5" }) => {
@@ -135,8 +143,15 @@
             const [showBuyBalanceModal, setShowBuyBalanceModal] = useState(false);
             const [showSupport, setShowSupport] = useState(false);
             const [showLeaderboard, setShowLeaderboard] = useState(false);
-            const [showCharity, setShowCharity] = useState(false);
             const [buyAmount, setBuyAmount] = useState(5500);
+            
+            const [showDonateModal, setShowDonateModal] = useState(false);
+            const [donateAmount, setDonateAmount] = useState(100);
+            const [donateCategory, setDonateCategory] = useState('');
+            const [showRatingModal, setShowRatingModal] = useState(false);
+            const [ratingApp, setRatingApp] = useState(null);
+            const [ratingValue, setRatingValue] = useState(5);
+            const [ratingType, setRatingType] = useState('');
             
             const [supportSubject, setSupportSubject] = useState('');
             const [supportMessage, setSupportMessage] = useState('');
@@ -361,20 +376,6 @@
                     }
                 } catch (err) {
                     alert('❌ Ошибка отправки отклика');
-                }
-            };
-
-            const approveApplication = async (applicationId) => {
-                try {
-                    const data = await api.approveApplication(token, applicationId);
-                    if (data.error) alert(data.error);
-                    else {
-                        alert('✅ Отклик одобрен!');
-                        loadTasks();
-                        loadProfile();
-                    }
-                } catch (err) {
-                    alert('❌ Ошибка одобрения');
                 }
             };
 
@@ -665,19 +666,19 @@
                                 <h3 className="font-bold mb-2">❤️ Благотворительность</h3>
                                 <div className="flex gap-3 flex-wrap">
                                     <button 
-                                        onClick={() => alert('Раздел "Животные" в разработке')}
+                                        onClick={() => { setDonateCategory('Животные'); setShowDonateModal(true); }}
                                         className="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-50 transition"
                                     >
                                         🐕 Животные
                                     </button>
                                     <button 
-                                        onClick={() => alert('Раздел "Дети" в разработке')}
+                                        onClick={() => { setDonateCategory('Дети'); setShowDonateModal(true); }}
                                         className="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-50 transition"
                                     >
                                         👶 Дети
                                     </button>
                                     <button 
-                                        onClick={() => alert('Спасибо за поддержку! ❤️')}
+                                        onClick={() => { setDonateCategory('Поддержка сайта'); setShowDonateModal(true); }}
                                         className="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-50 transition"
                                     >
                                         💚 Поддержать сайт
@@ -952,10 +953,21 @@
                                                                         {app.status === 'pending' && (
                                                                             <>
                                                                                 <button
-                                                                                    onClick={() => approveApplication(app.id)}
+                                                                                    onClick={async () => {
+                                                                                        try {
+                                                                                            const data = await api.acceptApplication(token, app.id);
+                                                                                            if (data.error) alert(data.error);
+                                                                                            else { 
+                                                                                                alert('✅ Отклик принят!'); 
+                                                                                                loadTasks(); 
+                                                                                            }
+                                                                                        } catch (err) {
+                                                                                            alert('❌ Ошибка принятия');
+                                                                                        }
+                                                                                    }}
                                                                                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm font-semibold"
                                                                                 >
-                                                                                    Подтвердить
+                                                                                    Принять отклик
                                                                                 </button>
                                                                                 <button
                                                                                     onClick={() => rejectApplication(app.id)}
@@ -965,7 +977,39 @@
                                                                                 </button>
                                                                             </>
                                                                         )}
-                                                                        {app.status === 'approved' && <span className="text-green-600 font-semibold">✓ Подтверждено</span>}
+                                                                        {app.status === 'accepted' && (
+                                                                            <button
+                                                                                onClick={async () => {
+                                                                                    try {
+                                                                                        const data = await api.confirmWork(token, app.id);
+                                                                                        if (data.error) alert(data.error);
+                                                                                        else { 
+                                                                                            alert('✅ Работа подтверждена!'); 
+                                                                                            loadTasks(); 
+                                                                                        }
+                                                                                    } catch (err) {
+                                                                                        alert('❌ Ошибка подтверждения');
+                                                                                    }
+                                                                                }}
+                                                                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold"
+                                                                            >
+                                                                                Подтвердить выполнение
+                                                                            </button>
+                                                                        )}
+                                                                        {app.status === 'work_done' && !app.employer_rated && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setRatingApp(app);
+                                                                                    setRatingType('worker');
+                                                                                    setRatingValue(5);
+                                                                                    setShowRatingModal(true);
+                                                                                }}
+                                                                                className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition text-sm font-semibold"
+                                                                            >
+                                                                                Оценить работника
+                                                                            </button>
+                                                                        )}
+                                                                        {app.status === 'completed' && <span className="text-green-600 font-semibold">✓ Завершено</span>}
                                                                         {app.status === 'rejected' && <span className="text-red-600 font-semibold">✗ Отклонено</span>}
                                                                     </div>
                                                                 </div>
@@ -999,12 +1043,16 @@
                                                     </div>
                                                 </div>
                                                 <div className={`px-4 py-2 rounded-lg font-semibold ${
-                                                    app.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                                    app.status === 'completed' ? 'bg-green-100 text-green-700' :
                                                     app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                    app.status === 'work_done' ? 'bg-blue-100 text-blue-700' :
+                                                    app.status === 'accepted' ? 'bg-purple-100 text-purple-700' :
                                                     'bg-yellow-100 text-yellow-700'
                                                 }`}>
-                                                    {app.status === 'approved' ? '✓ Одобрено' :
+                                                    {app.status === 'completed' ? '✓ Завершено' :
                                                      app.status === 'rejected' ? '✗ Отклонено' :
+                                                     app.status === 'work_done' ? '📝 Работа подтверждена' :
+                                                     app.status === 'accepted' ? '✅ Принято' :
                                                      '⏳ Ожидание'}
                                                 </div>
                                             </div>
@@ -1015,7 +1063,7 @@
                                                     <span>{app.location}</span>
                                                 </div>
                                             )}
-                                            {app.contacts && app.status === 'approved' && (
+                                            {app.contacts && app.status === 'accepted' && (
                                                 <div className="bg-green-50 rounded-lg p-4">
                                                     <p className="text-sm font-semibold mb-1">Контакты заказчика:</p>
                                                     <p className="text-sm text-gray-600">{app.contacts}</p>
@@ -1024,6 +1072,45 @@
                                             <div className="mt-3 text-sm text-gray-500">
                                                 Отклик отправлен: {new Date(app.applied_at).toLocaleString('ru-RU')}
                                             </div>
+                                            
+                                            {app.status === 'completed' && !app.worker_rated && (
+                                                <button
+                                                    onClick={() => {
+                                                        setRatingApp(app);
+                                                        setRatingType('employer');
+                                                        setRatingValue(5);
+                                                        setShowRatingModal(true);
+                                                    }}
+                                                    className="w-full bg-yellow-600 text-white py-3 rounded-lg hover:bg-yellow-700 transition font-semibold mt-3"
+                                                >
+                                                    Оценить работодателя
+                                                </button>
+                                            )}
+                                            {app.worker_rated && !app.payment_claimed && (
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const data = await api.claimPayment(token, app.id);
+                                                            if (data.error) alert(data.error);
+                                                            else {
+                                                                alert(data.message);
+                                                                loadMyApplications();
+                                                                loadProfile();
+                                                            }
+                                                        } catch (err) {
+                                                            alert('❌ Ошибка получения оплаты');
+                                                        }
+                                                    }}
+                                                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold mt-3"
+                                                >
+                                                    Получить {app.payment} Я баллов
+                                                </button>
+                                            )}
+                                            {app.payment_claimed && (
+                                                <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 mt-3">
+                                                    <p className="text-green-800 font-bold text-center">✓ Деньги получены!</p>
+                                                </div>
+                                            )}
                                         </div>
                                     ))
                                 )}
@@ -1309,6 +1396,123 @@
                                             </div>
                                         ))
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showDonateModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-lg max-w-md w-full p-8">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-bold">❤️ {donateCategory}</h2>
+                                    <button onClick={() => setShowDonateModal(false)}>
+                                        <Icon name="x" className="w-6 h-6 text-gray-500 hover:text-gray-700" />
+                                    </button>
+                                </div>
+                                
+                                <p className="text-gray-600 mb-4">Сколько хотите пожертвовать?</p>
+                                
+                                <div className="mb-6">
+                                    <label className="block text-center text-2xl font-bold text-green-600 mb-2">
+                                        {donateAmount} Я баллов
+                                    </label>
+                                    <p className="text-center text-gray-500 mb-4">= {(donateAmount / 10).toFixed(2)} рублей</p>
+                                    <input
+                                        type="range"
+                                        min="10"
+                                        max={user.balance}
+                                        step="10"
+                                        value={donateAmount}
+                                        onChange={(e) => setDonateAmount(parseInt(e.target.value))}
+                                        className="w-full"
+                                    />
+                                    <div className="flex justify-between text-sm text-gray-500 mt-2">
+                                        <span>10 Я</span>
+                                        <span>{user.balance} Я</span>
+                                    </div>
+                                </div>
+                                
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const data = await api.donate(token, donateAmount, donateCategory);
+                                            if (data.error) {
+                                                alert(data.error);
+                                            } else {
+                                                alert(data.message);
+                                                setUser(prev => ({ ...prev, balance: data.newBalance }));
+                                                setShowDonateModal(false);
+                                            }
+                                        } catch (err) {
+                                            alert('❌ Ошибка пожертвования');
+                                        }
+                                    }}
+                                    disabled={donateAmount < 10 || donateAmount > user.balance}
+                                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                >
+                                    Пожертвовать {donateAmount} Я
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {showRatingModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-lg max-w-md w-full p-8">
+                                <h2 className="text-2xl font-bold mb-6 text-center">
+                                    {ratingType === 'worker' ? 'Оценить работника' : 'Оценить работодателя'}
+                                </h2>
+                                
+                                <div className="flex justify-center gap-2 mb-6">
+                                    {[1,2,3,4,5].map(star => (
+                                        <button
+                                            key={star}
+                                            onClick={() => setRatingValue(star)}
+                                            className="transition-transform hover:scale-110"
+                                        >
+                                            <Star className={`w-12 h-12 ${star <= ratingValue ? 'text-yellow-400' : 'text-gray-300'}`} />
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <p className="text-center text-gray-600 mb-6">Ваша оценка: {ratingValue} ⭐</p>
+                                
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { setShowRatingModal(false); setRatingApp(null); }}
+                                        className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition font-semibold"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const data = ratingType === 'worker'
+                                                    ? await api.rateWorker(token, ratingApp.id, ratingValue)
+                                                    : await api.rateEmployer(token, ratingApp.id, ratingValue);
+                                                
+                                                if (data.error) {
+                                                    alert(data.error);
+                                                } else {
+                                                    alert(data.message);
+                                                    setShowRatingModal(false);
+                                                    setRatingApp(null);
+                                                    if (ratingType === 'worker') {
+                                                        loadTasks();
+                                                    } else {
+                                                        loadMyApplications();
+                                                    }
+                                                    loadProfile();
+                                                }
+                                            } catch (err) {
+                                                alert('❌ Ошибка оценки');
+                                            }
+                                        }}
+                                        className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold"
+                                    >
+                                        Оценить
+                                    </button>
                                 </div>
                             </div>
                         </div>
