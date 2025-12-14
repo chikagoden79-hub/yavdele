@@ -6,14 +6,9 @@
     <meta name="description" content="ЯвДеле - платформа для поиска и выполнения заданий. Зарабатывайте деньги выполняя простые задачи.">
     <title>ЯвДеле - Платформа заданий</title>
     
-    <!-- React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel для JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
@@ -24,10 +19,7 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
-        
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -36,45 +28,32 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // ==========================================
-        // КОНФИГУРАЦИЯ API
-        // ==========================================
         const API_URL = window.location.hostname === 'localhost' 
             ? 'http://localhost:3000/api' 
             : '/api';
 
-        // ==========================================
-        // API ФУНКЦИИ
-        // ==========================================
         const api = {
             async request(endpoint, options = {}) {
                 const res = await fetch(`${API_URL}${endpoint}`, {
                     ...options,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    }
+                    headers: { 'Content-Type': 'application/json', ...options.headers }
                 });
                 return res.json();
             },
-            
-            // Аутентификация
-            register: (username, password, type) => 
-                api.request('/register', { method: 'POST', body: JSON.stringify({ username, password, type }) }),
+            register: (username, password, type, agreedToTerms) => 
+                api.request('/register', { method: 'POST', body: JSON.stringify({ username, password, type, agreedToTerms }) }),
             login: (username, password) => 
                 api.request('/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
             getProfile: (token) => 
                 api.request('/profile', { headers: { 'Authorization': `Bearer ${token}` } }),
-            
-            // Задания
             getTasks: (filters = {}) => 
                 api.request('/tasks?' + new URLSearchParams(filters)),
             createTask: (token, data) => 
                 api.request('/tasks', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify(data) }),
+            deleteTask: (token, taskId) => 
+                api.request(`/tasks/${taskId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }),
             getMyTasks: (token) => 
                 api.request('/tasks/my', { headers: { 'Authorization': `Bearer ${token}` } }),
-            
-            // Отклики
             applyToTask: (token, taskId) => 
                 api.request(`/tasks/${taskId}/apply`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
             getTaskApplications: (token, taskId) => 
@@ -85,17 +64,20 @@
                 api.request(`/applications/${id}/approve`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
             rejectApplication: (token, id) => 
                 api.request(`/applications/${id}/reject`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-            
-            // Баланс
+            rateUser: (token, applicationId, rating, ratedUserId) => 
+                api.request(`/applications/${applicationId}/rate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ rating, ratedUserId }) }),
             addBalance: (token, amount) => 
                 api.request('/balance/add', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ amount }) }),
             withdrawBalance: (token) => 
-                api.request('/balance/withdraw', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } })
+                api.request('/balance/withdraw', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
+            buyPremium: (token) => 
+                api.request('/premium/buy', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
+            getLeaderboard: () => 
+                api.request('/leaderboard'),
+            sendSupport: (token, subject, message) => 
+                api.request('/support', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ subject, message }) })
         };
 
-        // ==========================================
-        // ИКОНКИ
-        // ==========================================
         const Icon = ({ name, className = "w-5 h-5" }) => {
             const paths = {
                 briefcase: "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
@@ -108,7 +90,8 @@
                 x: "M6 18L18 6M6 6l12 12",
                 send: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8",
                 wallet: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
-                award: "M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                award: "M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z",
+                trash: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
             };
             
             return (
@@ -124,17 +107,15 @@
             </svg>
         );
 
-        // ==========================================
-        // ГЛАВНЫЙ КОМПОНЕНТ
-        // ==========================================
         function TaskPlatform() {
-            // Состояние
             const [token, setToken] = useState(localStorage.getItem('token'));
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState('');
             
             const [showAuthModal, setShowAuthModal] = useState(!token);
+            const [showAgreement, setShowAgreement] = useState(false);
+            const [agreedToTerms, setAgreedToTerms] = useState(false);
             const [isLogin, setIsLogin] = useState(true);
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
@@ -152,7 +133,14 @@
             
             const [showCreateTask, setShowCreateTask] = useState(false);
             const [showBuyBalanceModal, setShowBuyBalanceModal] = useState(false);
+            const [showSupport, setShowSupport] = useState(false);
+            const [showLeaderboard, setShowLeaderboard] = useState(false);
+            const [showCharity, setShowCharity] = useState(false);
             const [buyAmount, setBuyAmount] = useState(5500);
+            
+            const [supportSubject, setSupportSubject] = useState('');
+            const [supportMessage, setSupportMessage] = useState('');
+            const [leaderboard, setLeaderboard] = useState([]);
             
             const [newTask, setNewTask] = useState({
                 title: '', category: 'Благотворительность', location: '', payment: 5000,
@@ -168,7 +156,62 @@
                 { id: 'Другое', name: 'Другое', icon: '📦' }
             ];
 
-            // Эффекты
+            const workerAgreement = `ТРУДОВОЙ ДОГОВОР ДЛЯ РАБОТНИКА
+
+Настоящий договор регулирует отношения между платформой ЯвДеле и Работником.
+
+1. ОБЩИЕ ПОЛОЖЕНИЯ
+Работник обязуется выполнять задания добросовестно и в срок, соблюдая все условия, указанные в описании задания.
+
+2. ПРАВА И ОБЯЗАННОСТИ
+Работник имеет право:
+- Выбирать задания для выполнения
+- Получать вознаграждение за выполненные задания
+- Выводить средства при достижении минимальной суммы (3000 Я баллов)
+
+Работник обязуется:
+- Выполнять задания качественно
+- Соблюдать сроки
+- Поддерживать профессиональное общение
+
+3. ОПЛАТА
+10 Я баллов = 1 рубль
+Минимальная сумма для вывода - 3000 Я баллов (300 рублей)
+
+4. РЕЙТИНГ
+Рейтинг формируется на основе оценок работодателей.
+Низкий рейтинг ограничивает доступ к некоторым заданиям.
+
+Нажимая "Согласен", вы подтверждаете согласие с условиями.`;
+
+            const employerAgreement = `ТРУДОВОЙ ДОГОВОР ДЛЯ РАБОТОДАТЕЛЯ
+
+Настоящий договор регулирует отношения между платформой ЯвДеле и Работодателем.
+
+1. ОБЩИЕ ПОЛОЖЕНИЯ
+Работодатель обязуется создавать задания в соответствии с правилами платформы и предоставлять точное описание работы.
+
+2. ПРАВА И ОБЯЗАННОСТИ
+Работодатель имеет право:
+- Создавать задания
+- Выбирать исполнителей
+- Оценивать качество выполненной работы
+
+Работодатель обязуется:
+- Предоставлять точное описание задания
+- Указывать реальные сроки
+- Подтверждать качественно выполненную работу
+- Оплачивать задания согласно установленной стоимости
+
+3. ОПЛАТА
+10 Я баллов = 1 рубль
+Баллы списываются при создании задания
+
+4. ПОДПИСКА ЯвДеле+
+За 10000 Я баллов можно активировать премиум подписку для установки минимального рейтинга исполнителей.
+
+Нажимая "Согласен", вы подтверждаете согласие с условиями.`;
+
             useEffect(() => {
                 if (token) {
                     loadProfile();
@@ -184,7 +227,6 @@
                 if (token && currentView === 'myApplications') loadMyApplications();
             }, [currentView]);
 
-            // Функции загрузки данных
             const loadProfile = async () => {
                 try {
                     const data = await api.getProfile(token);
@@ -227,14 +269,28 @@
                 }
             };
 
-            // Обработчики действий
+            const loadLeaderboard = async () => {
+                try {
+                    const data = await api.getLeaderboard();
+                    setLeaderboard(data);
+                    setShowLeaderboard(true);
+                } catch (err) {
+                    console.error(err);
+                }
+            };
+
             const handleAuth = async () => {
+                if (!isLogin && !agreedToTerms) {
+                    setShowAgreement(true);
+                    return;
+                }
+                
                 setError('');
                 setLoading(true);
                 try {
                     const data = isLogin 
                         ? await api.login(username, password)
-                        : await api.register(username, password, userType);
+                        : await api.register(username, password, userType, agreedToTerms);
                     
                     if (data.error) {
                         setError(data.error);
@@ -243,6 +299,7 @@
                         setToken(data.token);
                         setUser(data.user);
                         setShowAuthModal(false);
+                        setShowAgreement(false);
                     }
                 } catch (err) {
                     setError('Ошибка подключения к серверу');
@@ -274,6 +331,23 @@
                     }
                 } catch (err) {
                     setError('Ошибка создания задания');
+                }
+            };
+
+            const deleteTask = async (taskId) => {
+                if (!confirm('Удалить задание? Средства будут возвращены на баланс.')) return;
+                
+                try {
+                    const data = await api.deleteTask(token, taskId);
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert(data.message);
+                        loadTasks();
+                        loadProfile();
+                    }
+                } catch (err) {
+                    alert('Ошибка удаления');
                 }
             };
 
@@ -341,9 +415,86 @@
                 }
             };
 
-            // ==========================================
-            // РЕНДЕР - МОДАЛЬНОЕ ОКНО АВТОРИЗАЦИИ
-            // ==========================================
+            const buyPremium = async () => {
+                if (!confirm('Купить ЯвДеле+ за 10000 Я баллов?')) return;
+                
+                try {
+                    const data = await api.buyPremium(token);
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert(data.message);
+                        setUser(prev => ({ ...prev, balance: data.newBalance, has_premium: true }));
+                    }
+                } catch (err) {
+                    alert('❌ Ошибка покупки');
+                }
+            };
+
+            const sendSupportRequest = async () => {
+                if (!supportSubject || !supportMessage) {
+                    alert('Заполните все поля');
+                    return;
+                }
+                
+                try {
+                    const data = await api.sendSupport(token, supportSubject, supportMessage);
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert(data.message);
+                        setSupportSubject('');
+                        setSupportMessage('');
+                        setShowSupport(false);
+                    }
+                } catch (err) {
+                    alert('❌ Ошибка отправки');
+                }
+            };
+
+            if (showAgreement) {
+                return (
+                    <div className="min-h-screen bg-black bg-opacity-90 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                            <div className="p-6 border-b">
+                                <h2 className="text-2xl font-bold text-center">
+                                    {userType === 'worker' ? 'Трудовой договор для работника' : 'Трудовой договор для работодателя'}
+                                </h2>
+                                <p className="text-center text-gray-600 mt-2">Пожалуйста, ознакомьтесь с условиями</p>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                                <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans leading-relaxed">
+                                    {userType === 'worker' ? workerAgreement : employerAgreement}
+                                </pre>
+                            </div>
+                            
+                            <div className="p-6 border-t bg-white flex gap-4">
+                                <button
+                                    onClick={() => {
+                                        setAgreedToTerms(true);
+                                        setShowAgreement(false);
+                                        handleAuth();
+                                    }}
+                                    className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold"
+                                >
+                                    ✓ Согласен
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowAgreement(false);
+                                        setAgreedToTerms(false);
+                                    }}
+                                    className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition font-semibold"
+                                >
+                                    ✗ Не согласен
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             if (showAuthModal) {
                 return (
                     <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -419,12 +570,8 @@
 
             const myTasks = tasks.filter(t => t.employer_name === user.username);
 
-            // ==========================================
-            // РЕНДЕР - ГЛАВНАЯ СТРАНИЦА
-            // ==========================================
             return (
                 <div className="min-h-screen bg-gray-50">
-                    {/* HEADER */}
                     <header className="bg-gradient-to-r from-green-600 to-emerald-700 text-white shadow-lg sticky top-0 z-10">
                         <div className="max-w-7xl mx-auto px-4 py-4">
                             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -451,10 +598,14 @@
                                             <span className="font-bold">{user.rating.toFixed(1)}</span>
                                         </div>
                                     </div>
+                                    {user.has_premium && (
+                                        <div className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-lg font-bold text-sm">
+                                            ⭐ Premium
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             
-                            {/* НАВИГАЦИЯ */}
                             <nav className="flex flex-wrap gap-3 mt-4">
                                 <button
                                     onClick={() => setCurrentView('tasks')}
@@ -489,18 +640,54 @@
                                 </button>
                                 
                                 <button
+                                    onClick={loadLeaderboard}
+                                    className="px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg font-medium transition"
+                                >
+                                    🏆 Рейтинг
+                                </button>
+                                
+                                <button
+                                    onClick={() => setShowSupport(true)}
+                                    className="px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg font-medium transition"
+                                >
+                                    💬 Поддержка
+                                </button>
+                                
+                                <button
                                     onClick={logout}
                                     className="ml-auto px-4 py-2 bg-red-500 bg-opacity-80 hover:bg-opacity-100 rounded-lg transition"
                                 >
                                     Выход
                                 </button>
                             </nav>
+
+                            <div className="mt-4 bg-white bg-opacity-20 rounded-lg p-4">
+                                <h3 className="font-bold mb-2">❤️ Благотворительность</h3>
+                                <div className="flex gap-3 flex-wrap">
+                                    <button 
+                                        onClick={() => alert('Раздел "Животные" в разработке')}
+                                        className="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-50 transition"
+                                    >
+                                        🐕 Животные
+                                    </button>
+                                    <button 
+                                        onClick={() => alert('Раздел "Дети" в разработке')}
+                                        className="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-50 transition"
+                                    >
+                                        👶 Дети
+                                    </button>
+                                    <button 
+                                        onClick={() => alert('Спасибо за поддержку! ❤️')}
+                                        className="px-4 py-2 bg-white bg-opacity-30 rounded-lg hover:bg-opacity-50 transition"
+                                    >
+                                        💚 Поддержать сайт
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </header>
 
-                    {/* КОНТЕНТ */}
                     <div className="max-w-7xl mx-auto px-4 py-8">
-                        {/* ПРОФИЛЬ */}
                         {currentView === 'profile' && (
                             <div className="max-w-2xl mx-auto">
                                 <div className="bg-white rounded-lg shadow p-8">
@@ -522,6 +709,23 @@
                                             </div>
                                             <Icon name="award" className="w-12 h-12 text-yellow-600" />
                                         </div>
+                                        
+                                        {user.type === 'employer' && !user.has_premium && (
+                                            <button
+                                                onClick={buyPremium}
+                                                disabled={user.balance < 10000}
+                                                className={`w-full py-3 rounded-lg transition font-semibold ${user.balance >= 10000 ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                                            >
+                                                ⭐ Купить ЯвДеле+ (10000 Я)
+                                            </button>
+                                        )}
+                                        
+                                        {user.has_premium && (
+                                            <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
+                                                <p className="text-yellow-800 font-bold">⭐ У вас есть ЯвДеле+</p>
+                                                <p className="text-sm text-yellow-700 mt-1">Вы можете устанавливать минимальный рейтинг для исполнителей</p>
+                                            </div>
+                                        )}
                                         
                                         {user.type === 'employer' && (
                                             <button
@@ -546,7 +750,6 @@
                             </div>
                         )}
 
-                        {/* ЗАДАНИЯ */}
                         {currentView === 'tasks' && (
                             <>
                                 <div className="mb-6 flex gap-4 flex-wrap">
@@ -572,7 +775,6 @@
                                     )}
                                 </div>
 
-                                {/* ФИЛЬТРЫ */}
                                 <div className="bg-white rounded-lg shadow p-6 mb-6">
                                     <h3 className="font-semibold mb-4">Фильтры</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -612,7 +814,6 @@
                                     </div>
                                 </div>
 
-                                {/* СПИСОК ЗАДАНИЙ */}
                                 <div className="space-y-4">
                                     {tasks.length === 0 ? (
                                         <div className="text-center py-12 bg-white rounded-lg">
@@ -620,58 +821,74 @@
                                             <p className="text-gray-500 text-lg">Заданий не найдено</p>
                                         </div>
                                     ) : (
-                                        tasks.map(task => (
-                                            <div key={task.id} className="bg-white rounded-lg shadow hover:shadow-lg transition p-6">
-                                                <div className="flex justify-between items-start mb-3 flex-wrap gap-2">
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <span className="text-2xl">{categories.find(c => c.name === task.category)?.icon}</span>
-                                                            <h3 className="text-xl font-bold">{task.title}</h3>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-                                                            <div className="flex items-center gap-1">
-                                                                <Icon name="mapPin" className="w-4 h-4" />
-                                                                {task.location || 'Не указан'}
+                                        tasks.map(task => {
+                                            const canApply = user.type === 'worker' && user.rating >= task.min_rating;
+                                            const lowRating = user.type === 'worker' && user.rating < task.min_rating;
+                                            
+                                            return (
+                                                <div key={task.id} className="bg-white rounded-lg shadow hover:shadow-lg transition p-6">
+                                                    <div className="flex justify-between items-start mb-3 flex-wrap gap-2">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <span className="text-2xl">{categories.find(c => c.name === task.category)?.icon}</span>
+                                                                <h3 className="text-xl font-bold">{task.title}</h3>
                                                             </div>
-                                                            <div className="flex items-center gap-1 text-green-600 font-semibold">
-                                                                <Icon name="dollar" className="w-4 h-4" />
-                                                                {task.payment} Я ({(task.payment / 10).toFixed(0)} ₽)
+                                                            <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+                                                                <div className="flex items-center gap-1">
+                                                                    <Icon name="mapPin" className="w-4 h-4" />
+                                                                    {task.location || 'Не указан'}
+                                                                </div>
+                                                                <div className="flex items-center gap-1 text-green-600 font-semibold">
+                                                                    <Icon name="dollar" className="w-4 h-4" />
+                                                                    {task.payment} Я ({(task.payment / 10).toFixed(0)} ₽)
+                                                                </div>
+                                                                <div>Сложность: {'⭐'.repeat(task.difficulty)}</div>
+                                                                {task.min_rating > 0 && (
+                                                                    <div className="text-yellow-600">
+                                                                        Мин. рейтинг: {task.min_rating} ⭐
+                                                                    </div>
+                                                                )}
+                                                                <div className="text-gray-500">
+                                                                    📅 {new Date(task.created_at).toLocaleDateString('ru-RU')}
+                                                                </div>
                                                             </div>
-                                                            <div>Сложность: {'⭐'.repeat(task.difficulty)}</div>
-                                                            {task.min_rating > 0 && <div className="text-yellow-600">Мин. рейтинг: {task.min_rating} ⭐</div>}
                                                         </div>
                                                     </div>
-                                                </div>
-                                                <p className="text-gray-700 mb-4">{task.description}</p>
-                                                {task.requirements && (
-                                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                                                        <p className="text-sm font-semibold mb-1">Требования:</p>
-                                                        <p className="text-sm text-gray-600">{task.requirements}</p>
+                                                    <p className="text-gray-700 mb-4">{task.description}</p>
+                                                    {task.requirements && (
+                                                        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                                            <p className="text-sm font-semibold mb-1">Требования:</p>
+                                                            <p className="text-sm text-gray-600">{task.requirements}</p>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-between text-sm text-gray-500 flex-wrap gap-2">
+                                                        <div>
+                                                            <span>Заказчик: {task.employer_name}</span>
+                                                            <span className="ml-2 text-yellow-600">★ {task.employer_rating.toFixed(1)}</span>
+                                                        </div>
+                                                        {canApply && (
+                                                            <button
+                                                                onClick={() => applyToTask(task.id)}
+                                                                className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-semibold"
+                                                            >
+                                                                <Icon name="send" className="w-4 h-4" />
+                                                                Принять задание
+                                                            </button>
+                                                        )}
+                                                        {lowRating && (
+                                                            <div className="text-red-600 font-semibold">
+                                                                ⚠️ У вас слишком низкий рейтинг
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                                <div className="flex items-center justify-between text-sm text-gray-500 flex-wrap gap-2">
-                                                    <span>Заказчик: {task.employer_name}</span>
-                                                    {user.type === 'worker' && user.rating >= task.min_rating && (
-                                                        <button
-                                                            onClick={() => applyToTask(task.id)}
-                                                            className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-semibold"
-                                                        >
-                                                            <Icon name="send" className="w-4 h-4" />
-                                                            Принять задание
-                                                        </button>
-                                                    )}
-                                                    {user.type === 'worker' && user.rating < task.min_rating && (
-                                                        <div className="text-red-600 font-semibold">Недостаточный рейтинг</div>
-                                                    )}
                                                 </div>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </div>
                             </>
                         )}
 
-                        {/* МОИ ЗАДАНИЯ (РАБОТОДАТЕЛЬ) */}
                         {currentView === 'myTasks' && user.type === 'employer' && (
                             <div className="space-y-4">
                                 {myTasks.length === 0 ? (
@@ -690,17 +907,29 @@
                                         if (!taskApplications[task.id]) loadTaskApplications(task.id);
                                         return (
                                             <div key={task.id} className="bg-white rounded-lg shadow p-6">
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <div>
+                                                <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
+                                                    <div className="flex-1">
                                                         <h3 className="text-xl font-bold mb-2">{task.title}</h3>
-                                                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                        <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
                                                             <span>Оплата: {task.payment} Я</span>
                                                             <span>Сложность: {'⭐'.repeat(task.difficulty)}</span>
                                                             <span className={`font-semibold ${task.status === 'completed' ? 'text-green-600' : 'text-blue-600'}`}>
                                                                 {task.status === 'completed' ? '✓ Завершено' : '○ Активно'}
                                                             </span>
+                                                            <span className="text-gray-500">
+                                                                📅 {new Date(task.created_at).toLocaleDateString('ru-RU')}
+                                                            </span>
                                                         </div>
                                                     </div>
+                                                    {task.status === 'open' && (
+                                                        <button
+                                                            onClick={() => deleteTask(task.id)}
+                                                            className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm font-semibold"
+                                                        >
+                                                            <Icon name="trash" className="w-4 h-4" />
+                                                            Удалить
+                                                        </button>
+                                                    )}
                                                 </div>
                                                 <p className="text-gray-700 mb-4">{task.description}</p>
                                                 <div className="bg-green-50 rounded-lg p-4">
@@ -751,7 +980,6 @@
                             </div>
                         )}
 
-                        {/* МОИ ОТКЛИКИ (РАБОТНИК) */}
                         {currentView === 'myApplications' && user.type === 'worker' && (
                             <div className="space-y-4">
                                 {myApplications.length === 0 ? (
@@ -803,7 +1031,6 @@
                         )}
                     </div>
 
-                    {/* МОДАЛЬНОЕ ОКНО - СОЗДАНИЕ ЗАДАНИЯ */}
                     {showCreateTask && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
                             <div className="bg-white rounded-lg max-w-2xl w-full my-8 p-6">
@@ -853,11 +1080,14 @@
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Мин. рейтинг исполнителя</label>
+                                            <label className="block text-sm font-medium mb-1">
+                                                Мин. рейтинг исполнителя {!user.has_premium && '(нужен Premium)'}
+                                            </label>
                                             <select
                                                 value={newTask.minRating}
                                                 onChange={(e) => setNewTask({...newTask, minRating: parseFloat(e.target.value)})}
-                                                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                                                disabled={!user.has_premium}
+                                                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none disabled:bg-gray-100"
                                             >
                                                 <option value="0">Любой</option>
                                                 <option value="3">3.0 ⭐ и выше</option>
@@ -952,7 +1182,6 @@
                         </div>
                     )}
 
-                    {/* МОДАЛЬНОЕ ОКНО - ПОПОЛНЕНИЕ БАЛАНСА */}
                     {showBuyBalanceModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white rounded-lg max-w-md w-full p-8">
@@ -997,13 +1226,97 @@
                             </div>
                         </div>
                     )}
+
+                    {showSupport && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-lg max-w-md w-full p-6">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-bold">💬 Обращение в поддержку</h2>
+                                    <button onClick={() => setShowSupport(false)}>
+                                        <Icon name="x" className="w-6 h-6 text-gray-500 hover:text-gray-700" />
+                                    </button>
+                                </div>
+                                
+                                <input
+                                    type="text"
+                                    placeholder="Тема обращения"
+                                    value={supportSubject}
+                                    onChange={(e) => setSupportSubject(e.target.value)}
+                                    className="w-full p-3 border rounded-lg mb-3 focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                                
+                                <textarea
+                                    placeholder="Опишите вашу проблему или предложение..."
+                                    value={supportMessage}
+                                    onChange={(e) => setSupportMessage(e.target.value)}
+                                    rows={6}
+                                    className="w-full p-3 border rounded-lg mb-3 focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                                
+                                <button
+                                    onClick={sendSupportRequest}
+                                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold"
+                                >
+                                    Отправить обращение
+                                </button>
+                                
+                                <p className="text-sm text-gray-500 mt-3 text-center">
+                                    Мы ответим в течение 24 часов
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {showLeaderboard && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-bold">🏆 Топ пользователей</h2>
+                                    <button onClick={() => setShowLeaderboard(false)}>
+                                        <Icon name="x" className="w-6 h-6 text-gray-500 hover:text-gray-700" />
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    {leaderboard.length === 0 ? (
+                                        <p className="text-center text-gray-500 py-8">Пока нет оценок</p>
+                                    ) : (
+                                        leaderboard.map((u, index) => (
+                                            <div
+                                                key={index}
+                                                className={`flex items-center justify-between p-4 rounded-lg ${
+                                                    index === 0 ? 'bg-yellow-50 border-2 border-yellow-400' :
+                                                    index === 1 ? 'bg-gray-50 border-2 border-gray-300' :
+                                                    index === 2 ? 'bg-orange-50 border-2 border-orange-300' :
+                                                    'bg-gray-50'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl font-bold w-8">
+                                                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                                                    </span>
+                                                    <div>
+                                                        <p className="font-bold">{u.username}</p>
+                                                        <p className="text-sm text-gray-500">
+                                                            {u.total_ratings} {u.total_ratings === 1 ? 'оценка' : 'оценок'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Star className="w-6 h-6 text-yellow-500" />
+                                                    <span className="text-xl font-bold">{u.rating.toFixed(1)}</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        // ==========================================
-        // РЕНДЕР ПРИЛОЖЕНИЯ
-        // ==========================================
         ReactDOM.render(<TaskPlatform />, document.getElementById('root'));
     </script>
 </body>
