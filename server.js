@@ -106,8 +106,9 @@ function authenticateToken(req, res, next) {
 
 // АУТЕНТИФИКАЦИЯ
 app.post('/api/register', async (req, res) => {
-    const { username, password, type } = req.body;
+    const { username, password, type, agreedToTerms } = req.body;
     if (!username || !password || !type) return res.status(400).json({ error: 'Все поля обязательны' });
+    if (!agreedToTerms) return res.status(400).json({ error: 'Необходимо согласиться с условиями договора' });
     if (type !== 'worker' && type !== 'employer') return res.status(400).json({ error: 'Неверный тип пользователя' });
     if (username.length < 3) return res.status(400).json({ error: 'Имя пользователя должно быть не менее 3 символов' });
     if (password.length < 6) return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' });
