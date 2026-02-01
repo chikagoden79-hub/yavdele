@@ -19,7 +19,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-* { box-sizing: border-box; }
+
+* { 
+  box-sizing: border-box; 
+}
+
 .admin-btn { 
   position: fixed; 
   bottom: 20px; 
@@ -30,8 +34,13 @@ body {
   cursor: pointer; 
   border-radius: 50%;
   transition: opacity 0.3s;
+  background: #888;
+  z-index: 9999;
 }
-.admin-btn:hover { opacity: 0.5; }
+
+.admin-btn:hover { 
+  opacity: 0.5; 
+}
 </style>
 </head>
 <body>
@@ -40,46 +49,210 @@ body {
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
+// ====================================================================================================
+// API КОНФИГУРАЦИЯ И МЕТОДЫ
+// ====================================================================================================
+
 const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api';
 
 const api = {
   async request(endpoint, options = {}) {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...options.headers }
-    });
-    return res.json();
+    try {
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers: { 
+          'Content-Type': 'application/json', 
+          ...options.headers 
+        }
+      });
+      const data = await res.json();
+      return data;
+    } catch (error) {
+      console.error('API Error:', error);
+      return { error: 'Ошибка подключения к серверу' };
+    }
   },
-  register: (username, password, type, agreedToTerms) => api.request('/register', { method: 'POST', body: JSON.stringify({ username, password, type, agreedToTerms }) }),
-  login: (username, password) => api.request('/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  getProfile: (token) => api.request('/profile', { headers: { 'Authorization': `Bearer ${token}` } }),
-  getTasks: (filters = {}) => api.request('/tasks?' + new URLSearchParams(filters)),
-  createTask: (token, data) => api.request('/tasks', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify(data) }),
-  deleteTask: (token, taskId) => api.request(`/tasks/${taskId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }),
-  getMyTasks: (token) => api.request('/tasks/my', { headers: { 'Authorization': `Bearer ${token}` } }),
-  applyToTask: (token, taskId) => api.request(`/tasks/${taskId}/apply`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-  getTaskApplications: (token, taskId) => api.request(`/tasks/${taskId}/applications`, { headers: { 'Authorization': `Bearer ${token}` } }),
-  getMyApplications: (token) => api.request('/applications/my', { headers: { 'Authorization': `Bearer ${token}` } }),
-  approveApplication: (token, id) => api.request(`/applications/${id}/accept`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-  rejectApplication: (token, id) => api.request(`/applications/${id}/reject`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-  confirmWork: (token, id) => api.request(`/applications/${id}/confirm-work`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-  rateWorker: (token, id, rating) => api.request(`/applications/${id}/rate-worker`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ rating }) }),
-  rateEmployer: (token, id, rating) => api.request(`/applications/${id}/rate-employer`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ rating }) }),
-  claimPayment: (token, id) => api.request(`/applications/${id}/claim-payment`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-  addBalance: (token, amount) => api.request('/balance/add', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ amount }) }),
-  withdrawBalance: (token) => api.request('/balance/withdraw', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-  buyPremium: (token) => api.request('/premium/buy', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }),
-  getLeaderboard: () => api.request('/leaderboard'),
-  donate: (token, amount) => api.request('/charity/donate', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ amount }) }),
-  getChat: (token, taskId) => api.request(`/chat/${taskId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-  sendMessage: (token, taskId, text) => api.request(`/chat/${taskId}`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ text }) }),
-  getSupportMessages: (token) => api.request('/support/my-messages', { headers: { 'Authorization': `Bearer ${token}` } }),
-  sendSupport: (token, text) => api.request('/support/send', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ text }) }),
-  adminLogin: (password) => api.request('/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
-  getTickets: () => api.request('/admin/support-tickets'),
-  getTicketMessages: (userId) => api.request(`/admin/support-messages/${userId}`),
-  adminReply: (userId, text) => api.request('/admin/support-reply', { method: 'POST', body: JSON.stringify({ userId, text }) })
+  
+  // Методы аутентификации
+  register: (username, password, type, agreedToTerms) => 
+    api.request('/register', { 
+      method: 'POST', 
+      body: JSON.stringify({ username, password, type, agreedToTerms }) 
+    }),
+  
+  login: (username, password) => 
+    api.request('/login', { 
+      method: 'POST', 
+      body: JSON.stringify({ username, password }) 
+    }),
+  
+  getProfile: (token) => 
+    api.request('/profile', { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  // Методы работы с заданиями
+  getTasks: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    return api.request('/tasks?' + params.toString());
+  },
+  
+  createTask: (token, data) => 
+    api.request('/tasks', { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` }, 
+      body: JSON.stringify(data) 
+    }),
+  
+  deleteTask: (token, taskId) => 
+    api.request(`/tasks/${taskId}`, { 
+      method: 'DELETE', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  getMyTasks: (token) => 
+    api.request('/tasks/my', { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  // Методы работы с откликами
+  applyToTask: (token, taskId) => 
+    api.request(`/tasks/${taskId}/apply`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  getTaskApplications: (token, taskId) => 
+    api.request(`/tasks/${taskId}/applications`, { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  getMyApplications: (token) => 
+    api.request('/applications/my', { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  approveApplication: (token, id) => 
+    api.request(`/applications/${id}/accept`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  rejectApplication: (token, id) => 
+    api.request(`/applications/${id}/reject`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  confirmWork: (token, id) => 
+    api.request(`/applications/${id}/confirm-work`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  rateWorker: (token, id, rating) => 
+    api.request(`/applications/${id}/rate-worker`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` }, 
+      body: JSON.stringify({ rating }) 
+    }),
+  
+  rateEmployer: (token, id, rating) => 
+    api.request(`/applications/${id}/rate-employer`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` }, 
+      body: JSON.stringify({ rating }) 
+    }),
+  
+  claimPayment: (token, id) => 
+    api.request(`/applications/${id}/claim-payment`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  // Методы работы с балансом
+  addBalance: (token, amount) => 
+    api.request('/balance/add', { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` }, 
+      body: JSON.stringify({ amount }) 
+    }),
+  
+  withdrawBalance: (token) => 
+    api.request('/balance/withdraw', { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  buyPremium: (token) => 
+    api.request('/premium/buy', { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  // Остальные методы
+  getLeaderboard: () => 
+    api.request('/leaderboard'),
+  
+  donate: (token, amount) => 
+    api.request('/charity/donate', { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` }, 
+      body: JSON.stringify({ amount }) 
+    }),
+  
+  // Методы чата
+  getChat: (token, taskId) => 
+    api.request(`/chat/${taskId}`, { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  sendMessage: (token, taskId, text) => 
+    api.request(`/chat/${taskId}`, { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` }, 
+      body: JSON.stringify({ text }) 
+    }),
+  
+  // Методы поддержки
+  getSupportMessages: (token) => 
+    api.request('/support/my-messages', { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    }),
+  
+  sendSupport: (token, text) => 
+    api.request('/support/send', { 
+      method: 'POST', 
+      headers: { 'Authorization': `Bearer ${token}` }, 
+      body: JSON.stringify({ text }) 
+    }),
+  
+  // Методы админ-панели
+  adminLogin: (password) => 
+    api.request('/admin/login', { 
+      method: 'POST', 
+      body: JSON.stringify({ password }) 
+    }),
+  
+  getTickets: () => 
+    api.request('/admin/support-tickets'),
+  
+  getTicketMessages: (userId) => 
+    api.request(`/admin/support-messages/${userId}`),
+  
+  adminReply: (userId, text) => 
+    api.request('/admin/support-reply', { 
+      method: 'POST', 
+      body: JSON.stringify({ userId, text }) 
+    })
 };
+
+// ====================================================================================================
+// КОМПОНЕНТЫ ИКОНОК
+// ====================================================================================================
 
 const Icon = ({ name, className = "w-5 h-5" }) => {
   const paths = {
@@ -96,6 +269,7 @@ const Icon = ({ name, className = "w-5 h-5" }) => {
     award: "M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z",
     trash: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
   };
+  
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={paths[name]} />
@@ -103,18 +277,29 @@ const Icon = ({ name, className = "w-5 h-5" }) => {
   );
 };
 
-const Star = ({ className = "w-5 h-5" }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+const Star = ({ className = "w-5 h-5", filled = true }) => (
+  <svg className={className} fill={filled ? "currentColor" : "none"} stroke={filled ? "none" : "currentColor"} viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={filled ? 0 : 2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
   </svg>
 );
 
+// ====================================================================================================
+// ГЛАВНЫЙ КОМПОНЕНТ ПРИЛОЖЕНИЯ
+// ====================================================================================================
+
 function TaskPlatform() {
+  
+  // ==================================================================================================
+  // СОСТОЯНИЯ ПРИЛОЖЕНИЯ
+  // ==================================================================================================
+  
+  // Состояния авторизации
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
+  // Модальные окна авторизации
   const [showAuthModal, setShowAuthModal] = useState(!token);
   const [showAgreement, setShowAgreement] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -123,16 +308,19 @@ function TaskPlatform() {
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('worker');
   
+  // Задания и отклики
   const [tasks, setTasks] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
   const [taskApplications, setTaskApplications] = useState({});
   const [currentView, setCurrentView] = useState('tasks');
   
+  // Фильтры поиска
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [minPayment, setMinPayment] = useState(0);
   
+  // Модальные окна
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showBuyBalanceModal, setShowBuyBalanceModal] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
@@ -140,23 +328,35 @@ function TaskPlatform() {
   const [showDonate, setShowDonate] = useState(false);
   const [buyAmount, setBuyAmount] = useState(5500);
   
+  // Поддержка и рейтинг
   const [supportMessages, setSupportMessages] = useState([]);
   const [supportInput, setSupportInput] = useState('');
   const [leaderboard, setLeaderboard] = useState([]);
   
+  // Новое задание
   const [newTask, setNewTask] = useState({
-    title: '', category: 'Благотворительность', location: '', payment: 1000,
-    difficulty: 3, description: '', requirements: '', contacts: '', minRating: 0
+    title: '', 
+    category: 'Благотворительность', 
+    location: '', 
+    payment: 1000,
+    difficulty: 3, 
+    description: '', 
+    requirements: '', 
+    contacts: '', 
+    minRating: 0
   });
 
+  // Чат
   const [activeChat, setActiveChat] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [msgInput, setMsgInput] = useState('');
 
+  // Рейтинг
   const [showRating, setShowRating] = useState(null);
   const [selectedRating, setSelectedRating] = useState(5);
   const [donateAmount, setDonateAmount] = useState(1000);
 
+  // Админ
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminTickets, setAdminTickets] = useState([]);
@@ -164,10 +364,16 @@ function TaskPlatform() {
   const [adminMessages, setAdminMessages] = useState([]);
   const [adminInput, setAdminInput] = useState('');
 
+  // Refs для автоскролла
   const chatRef = useRef(null);
   const supportRef = useRef(null);
   const adminRef = useRef(null);
   
+  // ==================================================================================================
+  // КОНСТАНТЫ
+  // ==================================================================================================
+  
+  // Категории заданий
   const categories = [
     { id: 'all', name: 'Все категории', icon: '🌟' },
     { id: 'Благотворительность', name: 'Благотворительность', icon: '❤️' },
@@ -177,6 +383,7 @@ function TaskPlatform() {
     { id: 'Другое', name: 'Другое', icon: '📦' }
   ];
   
+  // Трудовые договоры
   const workerAgreement = `ТРУДОВОЙ ДОГОВОР ДЛЯ РАБОТНИКА
 
 Настоящий договор регулирует отношения между платформой ЯвДеле и Работником.
@@ -233,6 +440,12 @@ function TaskPlatform() {
 
 Нажимая "Согласен", вы подтверждаете согласие с условиями.`;
 
+
+  // ==================================================================================================
+  // EFFECTS - АВТОМАТИЧЕСКАЯ ЗАГРУЗКА ДАННЫХ
+  // ==================================================================================================
+  
+  // Загрузка профиля при входе
   useEffect(() => {
     if (token && !isAdmin) {
       loadProfile();
@@ -240,14 +453,21 @@ function TaskPlatform() {
     }
   }, [token]);
 
+  // Перезагрузка заданий при изменении фильтров
   useEffect(() => {
-    if (token) loadTasks();
+    if (token) {
+      loadTasks();
+    }
   }, [selectedCategory, selectedDifficulty, minPayment, searchQuery]);
 
+  // Загрузка откликов при переходе на вкладку
   useEffect(() => {
-    if (token && currentView === 'myApplications') loadMyApplications();
-  }, [currentView]);
+    if (token && currentView === 'myApplications') {
+      loadMyApplications();
+    }
+  }, [currentView, token]);
 
+  // Автообновление чата
   useEffect(() => {
     if (activeChat) {
       loadChat();
@@ -256,22 +476,30 @@ function TaskPlatform() {
     }
   }, [activeChat]);
 
+  // Автоскролл чата
   useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
   }, [chatMessages]);
 
+  // Автообновление поддержки
   useEffect(() => {
     if (showSupport && token) {
       loadSupportMessages();
       const interval = setInterval(loadSupportMessages, 3000);
       return () => clearInterval(interval);
     }
-  }, [showSupport]);
+  }, [showSupport, token]);
 
+  // Автоскролл поддержки
   useEffect(() => {
-    if (supportRef.current) supportRef.current.scrollTop = supportRef.current.scrollHeight;
+    if (supportRef.current) {
+      supportRef.current.scrollTop = supportRef.current.scrollHeight;
+    }
   }, [supportMessages]);
 
+  // Автообновление тикетов админа
   useEffect(() => {
     if (isAdmin) {
       loadAdminTickets();
@@ -280,6 +508,7 @@ function TaskPlatform() {
     }
   }, [isAdmin]);
 
+  // Автообновление сообщений админа
   useEffect(() => {
     if (adminActiveTicket) {
       loadAdminMessages();
@@ -288,17 +517,28 @@ function TaskPlatform() {
     }
   }, [adminActiveTicket]);
 
+  // Автоскролл админского чата
   useEffect(() => {
-    if (adminRef.current) adminRef.current.scrollTop = adminRef.current.scrollHeight;
+    if (adminRef.current) {
+      adminRef.current.scrollTop = adminRef.current.scrollHeight;
+    }
   }, [adminMessages]);
 
+  // ==================================================================================================
+  // ФУНКЦИИ ЗАГРУЗКИ ДАННЫХ
+  // ==================================================================================================
+  
   const loadProfile = async () => {
     try {
       const data = await api.getProfile(token);
-      if (data.error) logout();
-      else setUser(data);
+      if (data.error) {
+        console.error('Ошибка профиля:', data.error);
+        logout();
+      } else {
+        setUser(data);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка загрузки профиля:', err);
     }
   };
 
@@ -309,61 +549,117 @@ function TaskPlatform() {
       if (selectedDifficulty !== 'all') filters.difficulty = selectedDifficulty;
       if (minPayment > 0) filters.minPayment = minPayment;
       if (searchQuery) filters.search = searchQuery;
+      
       const data = await api.getTasks(filters);
-      setTasks(Array.isArray(data) ? data : []);
+      if (data.error) {
+        console.error('Ошибка загрузки заданий:', data.error);
+        setTasks([]);
+      } else {
+        setTasks(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка загрузки заданий:', err);
+      setTasks([]);
     }
   };
 
   const loadMyApplications = async () => {
     try {
       const data = await api.getMyApplications(token);
-      setMyApplications(Array.isArray(data) ? data : []);
+      if (data.error) {
+        console.error('Ошибка загрузки откликов:', data.error);
+        setMyApplications([]);
+      } else {
+        setMyApplications(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка загрузки откликов:', err);
+      setMyApplications([]);
     }
   };
 
   const loadTaskApplications = async (taskId) => {
     try {
       const data = await api.getTaskApplications(token, taskId);
-      setTaskApplications(prev => ({ ...prev, [taskId]: data }));
+      if (data.error) {
+        console.error('Ошибка загрузки откликов на задание:', data.error);
+      } else {
+        setTaskApplications(prev => ({ 
+          ...prev, 
+          [taskId]: Array.isArray(data) ? data : [] 
+        }));
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка загрузки откликов на задание:', err);
     }
   };
 
   const loadLeaderboard = async () => {
     try {
       const data = await api.getLeaderboard();
-      setLeaderboard(data);
+      if (data.error) {
+        console.error('Ошибка загрузки рейтинга:', data.error);
+        setLeaderboard([]);
+      } else {
+        setLeaderboard(Array.isArray(data) ? data : []);
+      }
       setShowLeaderboard(true);
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка загрузки рейтинга:', err);
+      setLeaderboard([]);
     }
   };
 
   const loadChat = async () => {
-    const data = await api.getChat(token, activeChat.task_id);
-    setChatMessages(Array.isArray(data) ? data : []);
+    if (!activeChat) return;
+    try {
+      const data = await api.getChat(token, activeChat.task_id);
+      if (!data.error) {
+        setChatMessages(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки чата:', err);
+    }
   };
 
   const loadSupportMessages = async () => {
-    const data = await api.getSupportMessages(token);
-    setSupportMessages(Array.isArray(data) ? data : []);
+    try {
+      const data = await api.getSupportMessages(token);
+      if (!data.error) {
+        setSupportMessages(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки поддержки:', err);
+    }
   };
 
   const loadAdminTickets = async () => {
-    const data = await api.getTickets();
-    setAdminTickets(Array.isArray(data) ? data : []);
+    try {
+      const data = await api.getTickets();
+      if (!data.error) {
+        setAdminTickets(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки тикетов:', err);
+    }
   };
 
   const loadAdminMessages = async () => {
-    const data = await api.getTicketMessages(adminActiveTicket.user_id);
-    setAdminMessages(Array.isArray(data) ? data : []);
+    if (!adminActiveTicket) return;
+    try {
+      const data = await api.getTicketMessages(adminActiveTicket.user_id);
+      if (!data.error) {
+        setAdminMessages(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки сообщений:', err);
+    }
   };
 
+  // ==================================================================================================
+  // ОБРАБОТЧИКИ ДЕЙСТВИЙ - АВТОРИЗАЦИЯ
+  // ==================================================================================================
+  
   const handleAuth = async () => {
     if (!isLogin && !agreedToTerms) {
       setShowAgreement(true);
@@ -372,6 +668,7 @@ function TaskPlatform() {
     
     setError('');
     setLoading(true);
+    
     try {
       const data = isLogin
         ? await api.login(username, password)
@@ -387,18 +684,30 @@ function TaskPlatform() {
         setAgreedToTerms(false);
       }
     } catch (err) {
+      console.error('Ошибка авторизации:', err);
       setError('Ошибка подключения к серверу');
     }
+    
     setLoading(false);
   };
 
   const handleAdminLogin = async (pwd) => {
-    const data = await api.adminLogin(pwd);
-    if (data.success) {
-      setIsAdmin(true);
-      setShowAdminLogin(false);
-    } else {
-      alert('❌ Неверный пароль');
+    try {
+      console.log('Попытка входа админа с паролем:', pwd);
+      const data = await api.adminLogin(pwd);
+      console.log('Ответ сервера:', data);
+      
+      if (data.success) {
+        setIsAdmin(true);
+        setShowAdminLogin(false);
+        console.log('✅ Вход в админ-панель выполнен');
+      } else {
+        alert('❌ Неверный пароль администратора');
+        console.log('❌ Неверный пароль');
+      }
+    } catch (error) {
+      console.error('Ошибка входа админа:', error);
+      alert('❌ Ошибка подключения: ' + error.message);
     }
   };
 
@@ -410,10 +719,16 @@ function TaskPlatform() {
     setShowAuthModal(true);
   };
 
+  // ==================================================================================================
+  // ОБРАБОТЧИКИ ДЕЙСТВИЙ - ЗАДАНИЯ
+  // ==================================================================================================
+  
   const createTask = async () => {
     setError('');
+    
     try {
       const data = await api.createTask(token, newTask);
+      
       if (data.error) {
         setError(data.error);
       } else {
@@ -421,12 +736,20 @@ function TaskPlatform() {
         loadTasks();
         loadProfile();
         setNewTask({
-          title: '', category: 'Благотворительность', location: '', payment: 1000,
-          difficulty: 3, description: '', requirements: '', contacts: '', minRating: 0
+          title: '', 
+          category: 'Благотворительность', 
+          location: '', 
+          payment: 1000,
+          difficulty: 3, 
+          description: '', 
+          requirements: '', 
+          contacts: '', 
+          minRating: 0
         });
-        alert('✅ Задание создано');
+        alert('✅ Задание успешно создано!');
       }
     } catch (err) {
+      console.error('Ошибка создания задания:', err);
       setError('Ошибка создания задания');
     }
   };
@@ -436,27 +759,39 @@ function TaskPlatform() {
     
     try {
       const data = await api.deleteTask(token, taskId);
+      
       if (data.error) {
-        alert(data.error);
+        alert('❌ ' + data.error);
       } else {
-        alert(data.message);
+        alert('✅ ' + data.message);
         loadTasks();
         loadProfile();
       }
     } catch (err) {
-      alert('Ошибка удаления');
+      console.error('Ошибка удаления:', err);
+      alert('❌ Ошибка удаления задания');
     }
   };
 
+  // ==================================================================================================
+  // ОБРАБОТЧИКИ ДЕЙСТВИЙ - ОТКЛИКИ
+  // ==================================================================================================
+  
   const applyToTask = async (taskId) => {
     try {
+      console.log('Отправка отклика на задание:', taskId);
       const data = await api.applyToTask(token, taskId);
-      if (data.error) alert(data.error);
-      else {
-        alert('✅ Отклик отправлен!');
+      console.log('Ответ сервера:', data);
+      
+      if (data.error) {
+        alert('❌ ' + data.error);
+      } else {
+        alert('✅ Отклик успешно отправлен!');
         loadTasks();
+        loadMyApplications();
       }
     } catch (err) {
+      console.error('Ошибка отправки отклика:', err);
       alert('❌ Ошибка отправки отклика');
     }
   };
@@ -464,148 +799,219 @@ function TaskPlatform() {
   const approveApplication = async (applicationId) => {
     try {
       const data = await api.approveApplication(token, applicationId);
-      if (data.error) alert(data.error);
-      else {
+      
+      if (data.error) {
+        alert('❌ ' + data.error);
+      } else {
         alert('✅ Отклик принят! Чат открыт.');
         loadTasks();
         loadProfile();
         loadMyApplications();
       }
     } catch (err) {
-      alert('❌ Ошибка одобрения');
+      console.error('Ошибка одобрения:', err);
+      alert('❌ Ошибка одобрения отклика');
+    }
+  };
+
+  const rejectApplication = async (applicationId) => {
+    try {
+      const data = await api.rejectApplication(token, applicationId);
+      
+      if (data.error) {
+        alert('❌ ' + data.error);
+      } else {
+        alert('✅ Отклик отклонен');
+        loadTasks();
+        loadMyApplications();
+      }
+    } catch (err) {
+      console.error('Ошибка отклонения:', err);
+      alert('❌ Ошибка отклонения отклика');
     }
   };
 
   const confirmWork = async (applicationId) => {
     try {
       const data = await api.confirmWork(token, applicationId);
-      if (data.error) alert(data.error);
-      else {
+      
+      if (data.error) {
+        alert('❌ ' + data.error);
+      } else {
         setShowRating({ appId: applicationId, type: 'worker' });
         loadMyApplications();
       }
     } catch (err) {
-      alert('❌ Ошибка');
+      console.error('Ошибка подтверждения:', err);
+      alert('❌ Ошибка подтверждения работы');
     }
   };
 
+  // ==================================================================================================
+  // ОБРАБОТЧИКИ ДЕЙСТВИЙ - РЕЙТИНГ И ОПЛАТА
+  // ==================================================================================================
+  
   const submitRating = async () => {
+    if (!showRating) return;
+    
     try {
+      let data;
+      
       if (showRating.type === 'worker') {
-        await api.rateWorker(token, showRating.appId, selectedRating);
-        alert('✅ Оценка поставлена');
+        data = await api.rateWorker(token, showRating.appId, selectedRating);
       } else {
-        await api.rateEmployer(token, showRating.appId, selectedRating);
-        alert('✅ Оценка поставлена. Теперь можете получить деньги.');
+        data = await api.rateEmployer(token, showRating.appId, selectedRating);
       }
-      setShowRating(null);
-      setSelectedRating(5);
-      loadMyApplications();
-      loadProfile();
+      
+      if (data.error) {
+        alert('❌ ' + data.error);
+      } else {
+        alert('✅ Оценка успешно поставлена!');
+        setShowRating(null);
+        setSelectedRating(5);
+        loadMyApplications();
+        loadProfile();
+      }
     } catch (err) {
-      alert('❌ Ошибка');
+      console.error('Ошибка оценки:', err);
+      alert('❌ Ошибка отправки оценки');
     }
   };
 
   const claimPayment = async (applicationId) => {
     try {
       const data = await api.claimPayment(token, applicationId);
+      
       if (data.error) {
-        alert(data.error);
+        alert('❌ ' + data.error);
       } else {
+        alert('💰 ' + data.message);
         loadProfile();
         loadMyApplications();
         setShowDonate(true);
       }
     } catch (err) {
-      alert('❌ Ошибка');
+      console.error('Ошибка получения оплаты:', err);
+      alert('❌ Ошибка получения оплаты');
     }
   };
 
-  const rejectApplication = async (applicationId) => {
-    try {
-      await api.rejectApplication(token, applicationId);
-      alert('✅ Отклик отклонен');
-      loadTasks();
-      loadMyApplications();
-    } catch (err) {
-      alert('❌ Ошибка отклонения');
-    }
-  };
-
+  // ==================================================================================================
+  // ОБРАБОТЧИКИ ДЕЙСТВИЙ - БАЛАНС
+  // ==================================================================================================
+  
   const buyBalance = async () => {
     try {
       const data = await api.addBalance(token, buyAmount);
-      if (data.error) alert(data.error);
-      else {
+      
+      if (data.error) {
+        alert('❌ ' + data.error);
+      } else {
         loadProfile();
         setShowBuyBalanceModal(false);
-        alert('✅ Баланс пополнен!');
+        alert('✅ Баланс успешно пополнен!');
       }
     } catch (err) {
-      alert('❌ Ошибка пополнения');
+      console.error('Ошибка пополнения:', err);
+      alert('❌ Ошибка пополнения баланса');
     }
   };
 
   const withdrawBalance = async () => {
     try {
       const data = await api.withdrawBalance(token);
-      if (data.error) alert(data.error);
-      else {
-        alert(data.message);
+      
+      if (data.error) {
+        alert('❌ ' + data.error);
+      } else {
+        alert('✅ ' + data.message);
         loadProfile();
       }
     } catch (err) {
-      alert('❌ Ошибка вывода');
+      console.error('Ошибка вывода:', err);
+      alert('❌ Ошибка вывода средств');
     }
   };
 
   const buyPremium = async () => {
-    if (!confirm('Купить ЯвДеле+ за 10000 Я баллов?')) return;
+    if (!confirm('Купить ЯвДеле+ за 10000 Я баллов (1000 ₽)?')) return;
     
     try {
       const data = await api.buyPremium(token);
+      
       if (data.error) {
-        alert(data.error);
+        alert('❌ ' + data.error);
       } else {
-        alert(data.message);
+        alert('✅ ' + data.message);
         loadProfile();
       }
     } catch (err) {
-      alert('❌ Ошибка покупки');
+      console.error('Ошибка покупки премиума:', err);
+      alert('❌ Ошибка покупки подписки');
     }
   };
 
   const handleDonate = async () => {
-    await api.donate(token, donateAmount);
-    if (donateAmount > 0) alert(`❤️ Спасибо! Вы пожертвовали ${donateAmount} Я (${(donateAmount/10).toFixed(0)} ₽)`);
-    loadProfile();
-    setShowDonate(false);
-    setDonateAmount(1000);
+    try {
+      const data = await api.donate(token, donateAmount);
+      
+      if (donateAmount > 0 && !data.error) {
+        alert(`❤️ Спасибо! Вы пожертвовали ${donateAmount} Я (${(donateAmount/10).toFixed(0)} ₽)`);
+      }
+      
+      loadProfile();
+      setShowDonate(false);
+      setDonateAmount(1000);
+    } catch (err) {
+      console.error('Ошибка пожертвования:', err);
+    }
   };
 
+  // ==================================================================================================
+  // ОБРАБОТЧИКИ ДЕЙСТВИЙ - ЧАТ И ПОДДЕРЖКА
+  // ==================================================================================================
+  
   const sendMsg = async () => {
-    if (!msgInput.trim()) return;
-    await api.sendMessage(token, activeChat.task_id, msgInput);
-    setMsgInput('');
-    loadChat();
+    if (!msgInput.trim() || !activeChat) return;
+    
+    try {
+      await api.sendMessage(token, activeChat.task_id, msgInput);
+      setMsgInput('');
+      loadChat();
+    } catch (err) {
+      console.error('Ошибка отправки сообщения:', err);
+    }
   };
 
   const sendSupportMsg = async () => {
     if (!supportInput.trim()) return;
-    await api.sendSupport(token, supportInput);
-    setSupportInput('');
-    loadSupportMessages();
+    
+    try {
+      await api.sendSupport(token, supportInput);
+      setSupportInput('');
+      loadSupportMessages();
+    } catch (err) {
+      console.error('Ошибка отправки в поддержку:', err);
+    }
   };
 
   const sendAdminReply = async () => {
-    if (!adminInput.trim()) return;
-    await api.adminReply(adminActiveTicket.user_id, adminInput);
-    setAdminInput('');
-    loadAdminMessages();
+    if (!adminInput.trim() || !adminActiveTicket) return;
+    
+    try {
+      await api.adminReply(adminActiveTicket.user_id, adminInput);
+      setAdminInput('');
+      loadAdminMessages();
+    } catch (err) {
+      console.error('Ошибка отправки ответа:', err);
+    }
   };
 
-  // AGREEMENT SCREEN
+
+  // ==================================================================================================
+  // RENDER - ЭКРАН СОГЛАСИЯ С ДОГОВОРОМ
+  // ==================================================================================================
+  
   if (showAgreement) {
     return (
       <div className="min-h-screen bg-black bg-opacity-90 flex items-center justify-center p-4">
@@ -649,19 +1055,28 @@ function TaskPlatform() {
     );
   }
 
-  // ADMIN PANEL
+  // ==================================================================================================
+  // RENDER - АДМИН-ПАНЕЛЬ
+  // ==================================================================================================
+  
   if (isAdmin) {
     return (
       <div className="min-h-screen bg-gray-100">
         <header className="bg-gradient-to-r from-red-600 to-orange-700 text-white shadow-lg p-4">
           <div className="max-w-6xl mx-auto flex justify-between items-center">
             <h1 className="text-2xl font-bold">🛠 Панель администратора</h1>
-            <button onClick={logout} className="bg-white bg-opacity-20 px-4 py-2 rounded-lg hover:bg-opacity-30 transition">Выход</button>
+            <button 
+              onClick={logout} 
+              className="bg-white bg-opacity-20 px-4 py-2 rounded-lg hover:bg-opacity-30 transition"
+            >
+              Выход
+            </button>
           </div>
         </header>
 
         <div className="max-w-6xl mx-auto p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
             <div className="bg-white rounded-lg shadow p-4">
               <h2 className="font-bold text-lg mb-4">📩 Обращения в поддержку</h2>
               <div className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -672,11 +1087,15 @@ function TaskPlatform() {
                     <div 
                       key={i} 
                       onClick={() => setAdminActiveTicket(ticket)}
-                      className={`p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition ${adminActiveTicket?.user_id === ticket.user_id ? 'border-green-500 bg-green-50' : ''}`}
+                      className={`p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition ${
+                        adminActiveTicket?.user_id === ticket.user_id ? 'border-green-500 bg-green-50' : ''
+                      }`}
                     >
                       <p className="font-semibold">{ticket.username}</p>
                       <p className="text-sm text-gray-600 truncate">{ticket.last_message}</p>
-                      <p className="text-xs text-gray-400">{new Date(ticket.updated_at).toLocaleString('ru-RU')}</p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(ticket.updated_at).toLocaleString('ru-RU')}
+                      </p>
                     </div>
                   ))
                 )}
@@ -686,17 +1105,33 @@ function TaskPlatform() {
             <div className="md:col-span-2 bg-white rounded-lg shadow p-4">
               {adminActiveTicket ? (
                 <>
-                  <h2 className="font-bold text-lg mb-4">Чат с {adminActiveTicket.username}</h2>
-                  <div ref={adminRef} className="h-[500px] overflow-y-auto mb-4 space-y-2 border rounded-lg p-3 bg-gray-50">
+                  <h2 className="font-bold text-lg mb-4">
+                    Чат с {adminActiveTicket.username}
+                  </h2>
+                  
+                  <div 
+                    ref={adminRef} 
+                    className="h-[500px] overflow-y-auto mb-4 space-y-2 border rounded-lg p-3 bg-gray-50"
+                  >
                     {adminMessages.map((msg, i) => (
-                      <div key={i} className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs rounded-lg p-3 ${msg.sender_type === 'admin' ? 'bg-red-600 text-white' : 'bg-gray-200'}`}>
-                          <p className="text-xs opacity-75 mb-1">{msg.sender_type === 'admin' ? 'Администратор' : adminActiveTicket.username}</p>
+                      <div 
+                        key={i} 
+                        className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div className={`max-w-xs rounded-lg p-3 ${
+                          msg.sender_type === 'admin' 
+                            ? 'bg-red-600 text-white' 
+                            : 'bg-gray-200'
+                        }`}>
+                          <p className="text-xs opacity-75 mb-1">
+                            {msg.sender_type === 'admin' ? 'Администратор' : adminActiveTicket.username}
+                          </p>
                           <p>{msg.text}</p>
                         </div>
                       </div>
                     ))}
                   </div>
+                  
                   <div className="flex gap-2">
                     <input 
                       type="text" 
@@ -706,7 +1141,10 @@ function TaskPlatform() {
                       placeholder="Введите ответ..." 
                       className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none" 
                     />
-                    <button onClick={sendAdminReply} className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition">
+                    <button 
+                      onClick={sendAdminReply} 
+                      className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition"
+                    >
                       <Icon name="send" />
                     </button>
                   </div>
@@ -717,13 +1155,17 @@ function TaskPlatform() {
                 </div>
               )}
             </div>
+            
           </div>
         </div>
       </div>
     );
   }
 
-  // AUTH SCREEN
+  // ==================================================================================================
+  // RENDER - ЭКРАН АВТОРИЗАЦИИ
+  // ==================================================================================================
+  
   if (showAuthModal) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-100 via-emerald-100 to-teal-100 flex items-center justify-center p-4">
@@ -743,13 +1185,17 @@ function TaskPlatform() {
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 rounded-lg transition ${isLogin ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
+              className={`flex-1 py-2 rounded-lg transition ${
+                isLogin ? 'bg-green-600 text-white' : 'bg-gray-200'
+              }`}
             >
               Вход
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 rounded-lg transition ${!isLogin ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
+              className={`flex-1 py-2 rounded-lg transition ${
+                !isLogin ? 'bg-green-600 text-white' : 'bg-gray-200'
+              }`}
             >
               Регистрация
             </button>
@@ -792,23 +1238,46 @@ function TaskPlatform() {
           </button>
         </div>
 
-        <button onClick={() => setShowAdminLogin(true)} className="admin-btn bg-gray-400 hover:bg-gray-500"></button>
+        <button 
+          onClick={() => setShowAdminLogin(true)} 
+          className="admin-btn"
+          title="Вход администратора"
+        />
 
         {showAdminLogin && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg p-6 max-w-sm w-full">
               <h3 className="text-xl font-bold mb-4">Вход администратора</h3>
-              <p className="text-xs text-gray-500 mb-3 text-center">Пароль: <code className="bg-gray-100 px-2 py-1 rounded">Y@vD3lE_Admin#9427</code></p>
+              <p className="text-xs text-gray-500 mb-3 text-center">
+                Пароль по умолчанию: <code className="bg-gray-100 px-2 py-1 rounded">Y@vD3lE_Admin#9427</code>
+              </p>
               <input 
                 type="password" 
                 placeholder="Введите пароль" 
                 id="adminPasswordInput"
-                onKeyPress={e => e.key === 'Enter' && handleAdminLogin(e.target.value)} 
+                onKeyPress={e => {
+                  if (e.key === 'Enter') {
+                    handleAdminLogin(e.target.value);
+                  }
+                }} 
                 className="w-full p-3 border rounded-lg mb-3 focus:ring-2 focus:ring-green-500 outline-none" 
               />
               <div className="flex gap-2">
-                <button onClick={() => handleAdminLogin(document.getElementById('adminPasswordInput').value)} className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">Войти</button>
-                <button onClick={() => setShowAdminLogin(false)} className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400 transition">Отмена</button>
+                <button 
+                  onClick={() => {
+                    const pwd = document.getElementById('adminPasswordInput').value;
+                    handleAdminLogin(pwd);
+                  }} 
+                  className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
+                >
+                  Войти
+                </button>
+                <button 
+                  onClick={() => setShowAdminLogin(false)} 
+                  className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400 transition"
+                >
+                  Отмена
+                </button>
               </div>
             </div>
           </div>
@@ -817,13 +1286,39 @@ function TaskPlatform() {
     );
   }
 
-  if (!user) return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>;
+  // ==================================================================================================
+  // RENDER - ЗАГРУЗКА
+  // ==================================================================================================
+  
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
 
+  // ==================================================================================================
+  // ВЫЧИСЛЯЕМ МОИ ЗАДАНИЯ
+  // ==================================================================================================
+  
   const myTasks = tasks.filter(t => t.employer_name === user.username);
 
+
+  // ==================================================================================================
+  // RENDER - ОСНОВНОЙ ИНТЕРФЕЙС
+  // ==================================================================================================
+  
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* HEADER */}
+      
+      {/* ============================================================================================
+          HEADER - ШАПКА САЙТА
+          ============================================================================================ */}
+      
       <header className="bg-gradient-to-r from-green-600 to-emerald-700 text-white shadow-lg sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
@@ -861,7 +1356,9 @@ function TaskPlatform() {
           <nav className="flex flex-wrap gap-3 mt-4">
             <button
               onClick={() => setCurrentView('tasks')}
-              className={`px-4 py-2 rounded-lg font-medium transition ${currentView === 'tasks' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'}`}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                currentView === 'tasks' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'
+              }`}
             >
               Все задания
             </button>
@@ -869,7 +1366,9 @@ function TaskPlatform() {
             {user.type === 'employer' && (
               <button
                 onClick={() => setCurrentView('myTasks')}
-                className={`px-4 py-2 rounded-lg font-medium transition ${currentView === 'myTasks' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'}`}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  currentView === 'myTasks' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'
+                }`}
               >
                 Мои задания ({myTasks.length})
               </button>
@@ -877,8 +1376,13 @@ function TaskPlatform() {
             
             {user.type === 'worker' && (
               <button
-                onClick={() => {setCurrentView('myApplications'); loadMyApplications();}}
-                className={`px-4 py-2 rounded-lg font-medium transition ${currentView === 'myApplications' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'}`}
+                onClick={() => {
+                  setCurrentView('myApplications'); 
+                  loadMyApplications();
+                }}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  currentView === 'myApplications' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'
+                }`}
               >
                 Мои отклики ({myApplications.length})
               </button>
@@ -886,7 +1390,9 @@ function TaskPlatform() {
             
             <button
               onClick={() => setCurrentView('profile')}
-              className={`px-4 py-2 rounded-lg font-medium transition ${currentView === 'profile' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'}`}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                currentView === 'profile' ? 'bg-white text-green-700' : 'bg-white bg-opacity-20 hover:bg-opacity-30'
+              }`}
             >
               Профиль
             </button>
@@ -948,9 +1454,16 @@ function TaskPlatform() {
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
+      {/* ============================================================================================
+          MAIN CONTENT - ОСНОВНОЙ КОНТЕНТ
+          ============================================================================================ */}
+      
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* PROFILE VIEW */}
+        
+        {/* ========================================================================================
+            VIEW: PROFILE - ЛИЧНЫЙ КАБИНЕТ
+            ======================================================================================== */}
+        
         {currentView === 'profile' && (
           <div className="max-w-2xl mx-auto">
             <div className="bg-white rounded-lg shadow p-8">
@@ -977,7 +1490,11 @@ function TaskPlatform() {
                   <button
                     onClick={buyPremium}
                     disabled={user.balance < 10000}
-                    className={`w-full py-3 rounded-lg transition font-semibold ${user.balance >= 10000 ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                    className={`w-full py-3 rounded-lg transition font-semibold ${
+                      user.balance >= 10000 
+                        ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
                   >
                     ⭐ Купить ЯвДеле+ (10000 Я = 1000 ₽)
                   </button>
@@ -986,7 +1503,9 @@ function TaskPlatform() {
                 {user.has_premium && (
                   <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
                     <p className="text-yellow-800 font-bold">⭐ У вас есть ЯвДеле+</p>
-                    <p className="text-sm text-yellow-700 mt-1">Вы можете устанавливать минимальный рейтинг для исполнителей</p>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Вы можете устанавливать минимальный рейтинг для исполнителей
+                    </p>
                   </div>
                 )}
                 
@@ -1003,7 +1522,11 @@ function TaskPlatform() {
                   <button
                     onClick={withdrawBalance}
                     disabled={user.balance < 3000}
-                    className={`w-full py-3 rounded-lg transition font-semibold ${user.balance >= 3000 ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                    className={`w-full py-3 rounded-lg transition font-semibold ${
+                      user.balance >= 3000 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
                   >
                     Вывести деньги (мин. 3000 Я)
                   </button>
@@ -1013,7 +1536,10 @@ function TaskPlatform() {
           </div>
         )}
 
-        {/* TASKS VIEW */}
+        {/* ========================================================================================
+            VIEW: TASKS - ВСЕ ЗАДАНИЯ
+            ======================================================================================== */}
+        
         {currentView === 'tasks' && (
           <>
             <div className="mb-6 flex gap-4 flex-wrap">
@@ -1049,7 +1575,9 @@ function TaskPlatform() {
                     onChange={(e) => setSelectedCategory(e.target.value)}
                     className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                   >
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -1060,11 +1588,15 @@ function TaskPlatform() {
                     className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                   >
                     <option value="all">Любая</option>
-                    {[1,2,3,4,5].map(d => <option key={d} value={d}>{'⭐'.repeat(d)}</option>)}
+                    {[1,2,3,4,5].map(d => (
+                      <option key={d} value={d}>{'⭐'.repeat(d)}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Оплата от {minPayment} Я</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Оплата от {minPayment} Я
+                  </label>
                   <input
                     type="range"
                     min="0"
@@ -1094,7 +1626,9 @@ function TaskPlatform() {
                       <div className="flex justify-between items-start mb-3 flex-wrap gap-2">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <span className="text-2xl">{categories.find(c => c.name === task.category)?.icon}</span>
+                            <span className="text-2xl">
+                              {categories.find(c => c.name === task.category)?.icon}
+                            </span>
                             <h3 className="text-xl font-bold">{task.title}</h3>
                           </div>
                           <div className="flex flex-wrap gap-3 text-sm text-gray-600">
@@ -1153,7 +1687,11 @@ function TaskPlatform() {
           </>
         )}
 
-        {/* MY TASKS VIEW */}
+
+        {/* ========================================================================================
+            VIEW: MY TASKS - МОИ ЗАДАНИЯ (для работодателя)
+            ======================================================================================== */}
+        
         {currentView === 'myTasks' && user.type === 'employer' && (
           <div className="space-y-4">
             {myTasks.length === 0 ? (
@@ -1169,7 +1707,10 @@ function TaskPlatform() {
               </div>
             ) : (
               myTasks.map(task => {
-                if (!taskApplications[task.id]) loadTaskApplications(task.id);
+                if (!taskApplications[task.id]) {
+                  loadTaskApplications(task.id);
+                }
+                
                 return (
                   <div key={task.id} className="bg-white rounded-lg shadow p-6">
                     <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
@@ -1178,7 +1719,13 @@ function TaskPlatform() {
                         <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
                           <span>Оплата: {task.payment} Я ({(task.payment / 10).toFixed(0)} ₽)</span>
                           <span>Откликов: {taskApplications[task.id]?.length || 0}</span>
-                          <span>Статус: {task.status === 'open' ? '🟢 Открыто' : task.status === 'in_progress' ? '🟡 В работе' : '✅ Завершено'}</span>
+                          <span>
+                            Статус: {
+                              task.status === 'open' ? '🟢 Открыто' :
+                              task.status === 'in_progress' ? '🟡 В работе' :
+                              '✅ Завершено'
+                            }
+                          </span>
                         </div>
                       </div>
                       <button
@@ -1197,12 +1744,20 @@ function TaskPlatform() {
                         <h4 className="font-semibold mb-3">Отклики:</h4>
                         <div className="space-y-2">
                           {taskApplications[task.id].map(app => (
-                            <div key={app.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div 
+                              key={app.id} 
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg flex-wrap gap-2"
+                            >
                               <div>
                                 <p className="font-medium">{app.worker_name}</p>
-                                <p className="text-sm text-gray-600">Рейтинг: {app.worker_rating.toFixed(1)} ⭐</p>
-                                <p className="text-xs text-gray-500">{new Date(app.created_at).toLocaleString('ru-RU')}</p>
+                                <p className="text-sm text-gray-600">
+                                  Рейтинг: {app.worker_rating.toFixed(1)} ⭐
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(app.created_at).toLocaleString('ru-RU')}
+                                </p>
                               </div>
+                              
                               {app.status === 'pending' && (
                                 <div className="flex gap-2">
                                   <button
@@ -1219,8 +1774,9 @@ function TaskPlatform() {
                                   </button>
                                 </div>
                               )}
+                              
                               {app.status === 'accepted' && (
-                                <div className="flex gap-2 items-center">
+                                <div className="flex gap-2 items-center flex-wrap">
                                   <span className="text-green-600 font-semibold">✓ Принят</span>
                                   <button
                                     onClick={() => setActiveChat(app)}
@@ -1236,6 +1792,7 @@ function TaskPlatform() {
                                   </button>
                                 </div>
                               )}
+                              
                               {app.status === 'completed' && (
                                 <span className="text-green-600 font-semibold">✅ Завершено</span>
                               )}
@@ -1251,7 +1808,10 @@ function TaskPlatform() {
           </div>
         )}
 
-        {/* MY APPLICATIONS VIEW */}
+        {/* ========================================================================================
+            VIEW: MY APPLICATIONS - МОИ ОТКЛИКИ (для работника)
+            ======================================================================================== */}
+        
         {currentView === 'myApplications' && user.type === 'worker' && (
           <div className="space-y-4">
             {myApplications.length === 0 ? (
@@ -1293,7 +1853,7 @@ function TaskPlatform() {
                   )}
                   
                   {app.status === 'accepted' && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <button
                         onClick={() => setActiveChat(app)}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
@@ -1331,9 +1891,14 @@ function TaskPlatform() {
             )}
           </div>
         )}
+        
       </div>
 
-      {/* CREATE TASK MODAL */}
+      {/* ============================================================================================
+          MODALS - МОДАЛЬНЫЕ ОКНА
+          ============================================================================================ */}
+
+      {/* MODAL: CREATE TASK - Создание задания */}
       {showCreateTask && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full my-8">
@@ -1413,7 +1978,9 @@ function TaskPlatform() {
               
               {user.has_premium && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">⭐ Минимальный рейтинг исполнителя</label>
+                  <label className="block text-sm font-medium mb-2">
+                    ⭐ Минимальный рейтинг исполнителя
+                  </label>
                   <input
                     type="number"
                     value={newTask.minRating}
@@ -1489,7 +2056,7 @@ function TaskPlatform() {
         </div>
       )}
 
-      {/* BUY BALANCE MODAL */}
+      {/* MODAL: BUY BALANCE - Пополнение баланса */}
       {showBuyBalanceModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -1548,7 +2115,8 @@ function TaskPlatform() {
         </div>
       )}
 
-      {/* CHAT MODAL */}
+
+      {/* MODAL: CHAT - Чат между работником и работодателем */}
       {activeChat && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
@@ -1562,10 +2130,16 @@ function TaskPlatform() {
             <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs rounded-lg p-3 ${msg.sender_id === user.id ? 'bg-green-600 text-white' : 'bg-white shadow'}`}>
+                  <div className={`max-w-xs rounded-lg p-3 ${
+                    msg.sender_id === user.id 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-white shadow'
+                  }`}>
                     <p className="text-xs opacity-75 mb-1">{msg.sender_name}</p>
                     <p>{msg.text}</p>
-                    <p className="text-xs opacity-75 mt-1">{new Date(msg.created_at).toLocaleTimeString('ru-RU')}</p>
+                    <p className="text-xs opacity-75 mt-1">
+                      {new Date(msg.created_at).toLocaleTimeString('ru-RU')}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -1580,7 +2154,10 @@ function TaskPlatform() {
                 placeholder="Введите сообщение..."
                 className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
               />
-              <button onClick={sendMsg} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+              <button 
+                onClick={sendMsg} 
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+              >
                 <Icon name="send" />
               </button>
             </div>
@@ -1588,7 +2165,7 @@ function TaskPlatform() {
         </div>
       )}
 
-      {/* RATING MODAL */}
+      {/* MODAL: RATING - Оценка работника/работодателя */}
       {showRating && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -1601,7 +2178,9 @@ function TaskPlatform() {
                 <button
                   key={rating}
                   onClick={() => setSelectedRating(rating)}
-                  className={`text-4xl transition ${rating <= selectedRating ? 'text-yellow-400' : 'text-gray-300'}`}
+                  className={`text-4xl transition ${
+                    rating <= selectedRating ? 'text-yellow-400' : 'text-gray-300'
+                  }`}
                 >
                   ⭐
                 </button>
@@ -1629,26 +2208,38 @@ function TaskPlatform() {
         </div>
       )}
 
-      {/* LEADERBOARD MODAL */}
+      {/* MODAL: LEADERBOARD - Таблица лидеров */}
       {showLeaderboard && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">🏆 Топ пользователей</h2>
-              <button onClick={() => setShowLeaderboard(false)} className="text-gray-500 hover:text-gray-700">
+              <button 
+                onClick={() => setShowLeaderboard(false)} 
+                className="text-gray-500 hover:text-gray-700"
+              >
                 <Icon name="x" />
               </button>
             </div>
             
             <div className="space-y-3">
               {leaderboard.map((user, i) => (
-                <div key={i} className={`flex items-center gap-4 p-4 rounded-lg ${i < 3 ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300' : 'bg-gray-50'}`}>
+                <div 
+                  key={i} 
+                  className={`flex items-center gap-4 p-4 rounded-lg ${
+                    i < 3 
+                      ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300' 
+                      : 'bg-gray-50'
+                  }`}
+                >
                   <div className="text-3xl font-bold w-12 text-center">
                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
                   </div>
                   <div className="flex-1">
                     <p className="font-bold">{user.username}</p>
-                    <p className="text-sm text-gray-600">{user.type === 'worker' ? '👷 Рабочий' : '👔 Работодатель'}</p>
+                    <p className="text-sm text-gray-600">
+                      {user.type === 'worker' ? '👷 Рабочий' : '👔 Работодатель'}
+                    </p>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1 text-yellow-600 font-bold">
@@ -1664,7 +2255,7 @@ function TaskPlatform() {
         </div>
       )}
 
-      {/* DONATE MODAL */}
+      {/* MODAL: DONATE - Благотворительность */}
       {showDonate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -1711,24 +2302,38 @@ function TaskPlatform() {
         </div>
       )}
 
-      {/* SUPPORT MODAL */}
+      {/* MODAL: SUPPORT - Поддержка */}
       {showSupport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
             <div className="p-4 border-b flex justify-between items-center">
               <h3 className="font-bold text-lg">💬 Поддержка</h3>
-              <button onClick={() => setShowSupport(false)} className="text-gray-500 hover:text-gray-700">
+              <button 
+                onClick={() => setShowSupport(false)} 
+                className="text-gray-500 hover:text-gray-700"
+              >
                 <Icon name="x" />
               </button>
             </div>
             
             <div ref={supportRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {supportMessages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.sender_type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs rounded-lg p-3 ${msg.sender_type === 'user' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'}`}>
-                    <p className="text-xs opacity-75 mb-1">{msg.sender_type === 'user' ? 'Вы' : 'Поддержка'}</p>
+                <div 
+                  key={i} 
+                  className={`flex ${msg.sender_type === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-xs rounded-lg p-3 ${
+                    msg.sender_type === 'user' 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-blue-600 text-white'
+                  }`}>
+                    <p className="text-xs opacity-75 mb-1">
+                      {msg.sender_type === 'user' ? 'Вы' : 'Поддержка'}
+                    </p>
                     <p>{msg.text}</p>
-                    <p className="text-xs opacity-75 mt-1">{new Date(msg.created_at).toLocaleString('ru-RU')}</p>
+                    <p className="text-xs opacity-75 mt-1">
+                      {new Date(msg.created_at).toLocaleString('ru-RU')}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -1743,18 +2348,27 @@ function TaskPlatform() {
                 placeholder="Опишите вашу проблему..."
                 className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
               />
-              <button onClick={sendSupportMsg} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+              <button 
+                onClick={sendSupportMsg} 
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+              >
                 <Icon name="send" />
               </button>
             </div>
           </div>
         </div>
       )}
+      
     </div>
   );
 }
 
+// ====================================================================================================
+// РЕНДЕР ПРИЛОЖЕНИЯ
+// ====================================================================================================
+
 ReactDOM.createRoot(document.getElementById('root')).render(<TaskPlatform />);
+
 </script>
 </body>
-  </html>
+</html>
