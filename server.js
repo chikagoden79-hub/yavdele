@@ -37,10 +37,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 function initDatabase() {
-    // Включаем внешние ключи
     db.run('PRAGMA foreign_keys = ON');
 
-    // Таблица пользователей
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -54,11 +52,8 @@ function initDatabase() {
         has_premium BOOLEAN DEFAULT 0,
         agreed_to_terms BOOLEAN DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`, (err) => {
-        if (err) console.error('❌ Ошибка создания таблицы users:', err);
-    });
+    )`);
 
-    // Таблица заданий
     db.run(`CREATE TABLE IF NOT EXISTS tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -74,11 +69,8 @@ function initDatabase() {
         status TEXT DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'completed', 'cancelled')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (employer_id) REFERENCES users(id)
-    )`, (err) => {
-        if (err) console.error('❌ Ошибка создания таблицы tasks:', err);
-    });
+    )`);
 
-    // Таблица откликов
     db.run(`CREATE TABLE IF NOT EXISTS applications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER NOT NULL,
@@ -90,11 +82,8 @@ function initDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (task_id) REFERENCES tasks(id),
         FOREIGN KEY (worker_id) REFERENCES users(id)
-    )`, (err) => {
-        if (err) console.error('❌ Ошибка создания таблицы applications:', err);
-    });
+    )`);
 
-    // Таблица чатов
     db.run(`CREATE TABLE IF NOT EXISTS chat_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER NOT NULL,
@@ -104,11 +93,8 @@ function initDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (task_id) REFERENCES tasks(id),
         FOREIGN KEY (sender_id) REFERENCES users(id)
-    )`, (err) => {
-        if (err) console.error('❌ Ошибка создания таблицы chat_messages:', err);
-    });
+    )`);
 
-    // Таблица обращений в поддержку
     db.run(`CREATE TABLE IF NOT EXISTS support_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -116,11 +102,8 @@ function initDatabase() {
         text TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
-    )`, (err) => {
-        if (err) console.error('❌ Ошибка создания таблицы support_messages:', err);
-    });
+    )`);
 
-    // Таблица благотворительности
     db.run(`CREATE TABLE IF NOT EXISTS charity_donations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -128,8 +111,7 @@ function initDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
     )`, (err) => {
-        if (err) console.error('❌ Ошибка создания таблицы charity_donations:', err);
-        else console.log('✅ Все таблицы базы данных инициализированы');
+        if (!err) console.log('✅ Все таблицы инициализированы');
     });
 }
 
@@ -165,10 +147,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // ====================================
-// API МАРШРУТЫ - АУТЕНТИФИКАЦИЯ
+// РЕГИСТРАЦИЯ
 // ====================================
-
-// Регистрация
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password, type, agreedToTerms } = req.body;
@@ -232,7 +212,9 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// Вход
+// ====================================
+// ВХОД
+// ====================================
 app.post('/api/login', (req, res) => {
     try {
         const { username, password } = req.body;
@@ -284,7 +266,9 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-// Получить профиль
+// ====================================
+// ПРОФИЛЬ
+// ====================================
 app.get('/api/profile', authenticateToken, (req, res) => {
     db.get(
         'SELECT id, username, type, balance, rating, has_premium, completed_tasks FROM users WHERE id = ?',
@@ -302,11 +286,10 @@ app.get('/api/profile', authenticateToken, (req, res) => {
     );
 });
 
-// ====================================
-// API МАРШРУТЫ - БАЛАНС
-// ====================================
 
-// Пополнить баланс
+// ====================================
+// БАЛАНС
+// ====================================
 app.post('/api/balance/add', authenticateToken, (req, res) => {
     const { amount } = req.body;
 
@@ -328,27 +311,21 @@ app.post('/api/balance/add', authenticateToken, (req, res) => {
                 [req.user.id],
                 (err, user) => {
                     if (err) {
-                        console.error('Ошибка получения баланса:', err);
                         return res.status(500).json({ error: 'Ошибка сервера' });
                     }
-                    res.json({ 
-                        message: 'Баланс успешно пополнен',
-                        balance: user.balance 
-                    });
+                    res.json({ message: 'Баланс успешно пополнен', balance: user.balance });
                 }
             );
         }
     );
 });
 
-// Вывести деньги
 app.post('/api/balance/withdraw', authenticateToken, (req, res) => {
     db.get(
         'SELECT balance, type FROM users WHERE id = ?',
         [req.user.id],
         (err, user) => {
             if (err) {
-                console.error('Ошибка вывода:', err);
                 return res.status(500).json({ error: 'Ошибка сервера' });
             }
 
@@ -368,7 +345,6 @@ app.post('/api/balance/withdraw', authenticateToken, (req, res) => {
                 [req.user.id],
                 function(err) {
                     if (err) {
-                        console.error('Ошибка обнуления баланса:', err);
                         return res.status(500).json({ error: 'Ошибка сервера' });
                     }
 
@@ -383,14 +359,12 @@ app.post('/api/balance/withdraw', authenticateToken, (req, res) => {
     );
 });
 
-// Купить премиум
 app.post('/api/premium/buy', authenticateToken, (req, res) => {
     db.get(
         'SELECT balance, has_premium, type FROM users WHERE id = ?',
         [req.user.id],
         (err, user) => {
             if (err) {
-                console.error('Ошибка покупки премиума:', err);
                 return res.status(500).json({ error: 'Ошибка сервера' });
             }
 
@@ -411,12 +385,11 @@ app.post('/api/premium/buy', authenticateToken, (req, res) => {
                 [req.user.id],
                 function(err) {
                     if (err) {
-                        console.error('Ошибка активации премиума:', err);
                         return res.status(500).json({ error: 'Ошибка сервера' });
                     }
 
                     res.json({ 
-                        message: '⭐ ЯвДеле+ успешно активирован! Теперь вы можете устанавливать минимальный рейтинг для исполнителей.',
+                        message: '⭐ ЯвДеле+ успешно активирован!',
                         newBalance: user.balance - 10000,
                         has_premium: true
                     });
@@ -427,10 +400,8 @@ app.post('/api/premium/buy', authenticateToken, (req, res) => {
 });
 
 // ====================================
-// API МАРШРУТЫ - ЗАДАНИЯ
+// ЗАДАНИЯ
 // ====================================
-
-// Создать задание
 app.post('/api/tasks', authenticateToken, (req, res) => {
     const { title, category, location, payment, difficulty, description, requirements, contacts, minRating } = req.body;
 
@@ -448,7 +419,6 @@ app.post('/api/tasks', authenticateToken, (req, res) => {
 
     db.get('SELECT balance, has_premium FROM users WHERE id = ?', [req.user.id], (err, user) => {
         if (err) {
-            console.error('Ошибка создания задания:', err);
             return res.status(500).json({ error: 'Ошибка сервера' });
         }
 
@@ -460,12 +430,19 @@ app.post('/api/tasks', authenticateToken, (req, res) => {
             return res.status(400).json({ error: 'Для установки минимального рейтинга нужна подписка ЯвДеле+' });
         }
 
+        if (minRating > 5) {
+            return res.status(400).json({ error: 'Максимальный рейтинг - 5.0' });
+        }
+
+        if (minRating < 0) {
+            return res.status(400).json({ error: 'Минимальный рейтинг не может быть отрицательным' });
+        }
+
         db.run(
             'UPDATE users SET balance = balance - ? WHERE id = ?',
             [payment, req.user.id],
             function(err) {
                 if (err) {
-                    console.error('Ошибка списания средств:', err);
                     return res.status(500).json({ error: 'Ошибка сервера' });
                 }
 
@@ -476,7 +453,6 @@ app.post('/api/tasks', authenticateToken, (req, res) => {
                     function(err) {
                         if (err) {
                             db.run('UPDATE users SET balance = balance + ? WHERE id = ?', [payment, req.user.id]);
-                            console.error('Ошибка вставки задания:', err);
                             return res.status(500).json({ error: 'Ошибка создания задания' });
                         }
 
@@ -492,7 +468,6 @@ app.post('/api/tasks', authenticateToken, (req, res) => {
     });
 });
 
-// Получить все задания
 app.get('/api/tasks', (req, res) => {
     const { category, difficulty, minPayment, search } = req.query;
     
@@ -535,14 +510,12 @@ app.get('/api/tasks', (req, res) => {
     });
 });
 
-// Получить мои задания
 app.get('/api/tasks/my', authenticateToken, (req, res) => {
     db.all(
         'SELECT * FROM tasks WHERE employer_id = ? ORDER BY created_at DESC',
         [req.user.id],
         (err, tasks) => {
             if (err) {
-                console.error('Ошибка получения моих заданий:', err);
                 return res.status(500).json({ error: 'Ошибка сервера' });
             }
             res.json(tasks || []);
@@ -550,13 +523,11 @@ app.get('/api/tasks/my', authenticateToken, (req, res) => {
     );
 });
 
-// Удалить задание
 app.delete('/api/tasks/:taskId', authenticateToken, (req, res) => {
     const taskId = req.params.taskId;
 
     db.get('SELECT * FROM tasks WHERE id = ? AND employer_id = ?', [taskId, req.user.id], (err, task) => {
         if (err) {
-            console.error('Ошибка удаления задания:', err);
             return res.status(500).json({ error: 'Ошибка сервера' });
         }
 
@@ -565,12 +536,11 @@ app.delete('/api/tasks/:taskId', authenticateToken, (req, res) => {
         }
 
         if (task.status !== 'open') {
-            return res.status(400).json({ error: 'Можно удалять только открытые задания без принятых откликов' });
+            return res.status(400).json({ error: 'Можно удалять только открытые задания' });
         }
 
         db.get('SELECT COUNT(*) as count FROM applications WHERE task_id = ? AND status = "accepted"', [taskId], (err, result) => {
             if (err) {
-                console.error('Ошибка проверки откликов:', err);
                 return res.status(500).json({ error: 'Ошибка сервера' });
             }
 
@@ -580,19 +550,16 @@ app.delete('/api/tasks/:taskId', authenticateToken, (req, res) => {
 
             db.run('DELETE FROM applications WHERE task_id = ?', [taskId], (err) => {
                 if (err) {
-                    console.error('Ошибка удаления откликов:', err);
                     return res.status(500).json({ error: 'Ошибка сервера' });
                 }
 
                 db.run('DELETE FROM tasks WHERE id = ?', [taskId], (err) => {
                     if (err) {
-                        console.error('Ошибка удаления задания из БД:', err);
                         return res.status(500).json({ error: 'Ошибка сервера' });
                     }
 
                     db.run('UPDATE users SET balance = balance + ? WHERE id = ?', [task.payment, req.user.id], (err) => {
                         if (err) {
-                            console.error('Ошибка возврата средств:', err);
                             return res.status(500).json({ error: 'Ошибка возврата средств' });
                         }
 
@@ -607,12 +574,730 @@ app.delete('/api/tasks/:taskId', authenticateToken, (req, res) => {
     });
 });
 
-// ====================================
-// ОСТАЛЬНЫЕ API (сокращено для экономии места)
-// ====================================
 
-// ... (откл��ки, чат, поддержка, благотворительность, рейтинг, админ-панель)
-// Полный код слишком длинный, продолжу в следующем файле
+// ====================================
+// ОТКЛИКИ НА ЗАДАНИЯ - ИСПРАВЛЕНО!
+// ====================================
+app.post('/api/tasks/:taskId/apply', authenticateToken, (req, res) => {
+    const taskId = req.params.taskId;
+
+    if (req.user.type !== 'worker') {
+        return res.status(400).json({ error: 'Только работники могут откликаться на задания' });
+    }
+
+    // Проверяем существующие отклики
+    db.get(
+        'SELECT * FROM applications WHERE task_id = ? AND worker_id = ?',
+        [taskId, req.user.id],
+        (err, existing) => {
+            if (err) {
+                console.error('Ошибка проверки откликов:', err);
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (existing) {
+                return res.status(400).json({ error: 'Вы уже откликнулись на это задание' });
+            }
+
+            // Получаем инфо о задании и рейтинге работника
+            db.get(
+                `SELECT t.*, u.rating as worker_rating 
+                 FROM tasks t, users u 
+                 WHERE t.id = ? AND u.id = ?`,
+                [taskId, req.user.id],
+                (err, data) => {
+                    if (err) {
+                        console.error('Ошибка получения данных:', err);
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    if (!data) {
+                        return res.status(404).json({ error: 'Задание не найдено' });
+                    }
+
+                    if (data.status !== 'open') {
+                        return res.status(400).json({ error: 'Задание уже не доступно' });
+                    }
+
+                    if (data.worker_rating < data.min_rating) {
+                        return res.status(400).json({ error: 'Ваш рейтинг ниже требуемого для этого задания' });
+                    }
+
+                    // Создаём отклик
+                    db.run(
+                        'INSERT INTO applications (task_id, worker_id, status) VALUES (?, ?, ?)',
+                        [taskId, req.user.id, 'pending'],
+                        function(err) {
+                            if (err) {
+                                console.error('Ошибка создания отклика:', err);
+                                return res.status(500).json({ error: 'Ошибка сервера' });
+                            }
+                            
+                            console.log(`✅ Отклик создан: ID ${this.lastID}, task ${taskId}, worker ${req.user.id}`);
+                            
+                            res.json({ 
+                                id: this.lastID, 
+                                message: 'Отклик успешно отправлен',
+                                success: true
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
+app.get('/api/tasks/:taskId/applications', authenticateToken, (req, res) => {
+    const taskId = req.params.taskId;
+
+    db.get('SELECT employer_id FROM tasks WHERE id = ?', [taskId], (err, task) => {
+        if (err) {
+            return res.status(500).json({ error: 'Ошибка сервера' });
+        }
+
+        if (!task) {
+            return res.status(404).json({ error: 'Задание не найдено' });
+        }
+
+        if (task.employer_id !== req.user.id) {
+            return res.status(403).json({ error: 'Нет доступа' });
+        }
+
+        db.all(
+            `SELECT a.*, u.username as worker_name, u.rating as worker_rating 
+             FROM applications a 
+             JOIN users u ON a.worker_id = u.id 
+             WHERE a.task_id = ?
+             ORDER BY a.created_at DESC`,
+            [taskId],
+            (err, applications) => {
+                if (err) {
+                    return res.status(500).json({ error: 'Ошибка сервера' });
+                }
+                res.json(applications || []);
+            }
+        );
+    });
+});
+
+app.get('/api/applications/my', authenticateToken, (req, res) => {
+    db.all(
+        `SELECT 
+            a.id,
+            a.task_id,
+            a.status,
+            a.worker_rated,
+            a.employer_rated,
+            a.payment_claimed,
+            a.created_at,
+            t.title as task_title,
+            t.payment as task_payment,
+            t.description as task_description,
+            t.contacts as task_contacts,
+            u.username as employer_name,
+            u.rating as employer_rating
+         FROM applications a
+         JOIN tasks t ON a.task_id = t.id
+         JOIN users u ON t.employer_id = u.id
+         WHERE a.worker_id = ?
+         ORDER BY a.created_at DESC`,
+        [req.user.id],
+        (err, applications) => {
+            if (err) {
+                console.error('Ошибка получения откликов:', err);
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            res.json(applications || []);
+        }
+    );
+});
+
+app.post('/api/applications/:applicationId/accept', authenticateToken, (req, res) => {
+    const applicationId = req.params.applicationId;
+
+    db.get(
+        `SELECT a.*, t.employer_id, t.status as task_status
+         FROM applications a 
+         JOIN tasks t ON a.task_id = t.id 
+         WHERE a.id = ?`,
+        [applicationId],
+        (err, application) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!application) {
+                return res.status(404).json({ error: 'Отклик не найден' });
+            }
+
+            if (application.employer_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет прав' });
+            }
+
+            if (application.status !== 'pending') {
+                return res.status(400).json({ error: 'Отклик уже обработан' });
+            }
+
+            db.run(
+                'UPDATE applications SET status = "rejected" WHERE task_id = ? AND id != ?',
+                [application.task_id, applicationId],
+                (err) => {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    db.run('UPDATE applications SET status = "accepted" WHERE id = ?', [applicationId], (err) => {
+                        if (err) {
+                            return res.status(500).json({ error: 'Ошибка сервера' });
+                        }
+
+                        db.run('UPDATE tasks SET status = "in_progress" WHERE id = ?', [application.task_id], (err) => {
+                            if (err) {
+                                return res.status(500).json({ error: 'Ошибка сервера' });
+                            }
+
+                            res.json({ message: 'Отклик принят! Чат открыт для общения.' });
+                        });
+                    });
+                }
+            );
+        }
+    );
+});
+
+app.post('/api/applications/:applicationId/reject', authenticateToken, (req, res) => {
+    const applicationId = req.params.applicationId;
+
+    db.get(
+        `SELECT a.*, t.employer_id
+         FROM applications a 
+         JOIN tasks t ON a.task_id = t.id 
+         WHERE a.id = ?`,
+        [applicationId],
+        (err, application) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!application) {
+                return res.status(404).json({ error: 'Отклик не найден' });
+            }
+
+            if (application.employer_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет прав' });
+            }
+
+            db.run('UPDATE applications SET status = "rejected" WHERE id = ?', [applicationId], (err) => {
+                if (err) {
+                    return res.status(500).json({ error: 'Ошибка сервера' });
+                }
+                res.json({ message: 'Отклик отклонен' });
+            });
+        }
+    );
+});
+
+app.post('/api/applications/:applicationId/confirm-work', authenticateToken, (req, res) => {
+    const applicationId = req.params.applicationId;
+
+    db.get(
+        `SELECT a.*, t.employer_id
+         FROM applications a 
+         JOIN tasks t ON a.task_id = t.id 
+         WHERE a.id = ?`,
+        [applicationId],
+        (err, application) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!application) {
+                return res.status(404).json({ error: 'Отклик не найден' });
+            }
+
+            if (application.employer_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет прав' });
+            }
+
+            if (application.status !== 'accepted') {
+                return res.status(400).json({ error: 'Работа еще не принята' });
+            }
+
+            db.run('UPDATE applications SET status = "completed" WHERE id = ?', [applicationId], (err) => {
+                if (err) {
+                    return res.status(500).json({ error: 'Ошибка сервера' });
+                }
+
+                db.run('UPDATE tasks SET status = "completed" WHERE id = ?', [application.task_id], (err) => {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    res.json({ message: 'Работа подтверждена. Теперь вы можете оценить исполнителя.' });
+                });
+            });
+        }
+    );
+});
+
+app.post('/api/applications/:applicationId/rate-worker', authenticateToken, (req, res) => {
+    const applicationId = req.params.applicationId;
+    const { rating } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'Оценка должна быть от 1 до 5' });
+    }
+
+    db.get(
+        `SELECT a.*, t.employer_id
+         FROM applications a 
+         JOIN tasks t ON a.task_id = t.id 
+         WHERE a.id = ?`,
+        [applicationId],
+        (err, application) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!application) {
+                return res.status(404).json({ error: 'Отклик не найден' });
+            }
+
+            if (application.employer_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет прав' });
+            }
+
+            if (application.status !== 'completed') {
+                return res.status(400).json({ error: 'Работа еще не завершена' });
+            }
+
+            if (application.worker_rated) {
+                return res.status(400).json({ error: 'Вы уже оценили этого работника' });
+            }
+
+            db.run(
+                'UPDATE users SET rating_sum = rating_sum + ?, total_ratings = total_ratings + 1, completed_tasks = completed_tasks + 1 WHERE id = ?',
+                [rating, application.worker_id],
+                (err) => {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    db.run(
+                        'UPDATE users SET rating = CAST(rating_sum AS REAL) / total_ratings WHERE id = ?',
+                        [application.worker_id],
+                        (err) => {
+                            if (err) {
+                                return res.status(500).json({ error: 'Ошибка сервера' });
+                            }
+
+                            db.run(
+                                'UPDATE applications SET worker_rated = 1 WHERE id = ?',
+                                [applicationId],
+                                (err) => {
+                                    if (err) {
+                                        return res.status(500).json({ error: 'Ошибка сервера' });
+                                    }
+
+                                    res.json({ message: 'Оценка успешно поставлена!' });
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
+app.post('/api/applications/:applicationId/rate-employer', authenticateToken, (req, res) => {
+    const applicationId = req.params.applicationId;
+    const { rating } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'Оценка должна быть от 1 до 5' });
+    }
+
+    db.get(
+        `SELECT a.*, t.employer_id
+         FROM applications a 
+         JOIN tasks t ON a.task_id = t.id 
+         WHERE a.id = ?`,
+        [applicationId],
+        (err, application) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!application) {
+                return res.status(404).json({ error: 'Отклик не найден' });
+            }
+
+            if (application.worker_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет прав' });
+            }
+
+            if (application.status !== 'completed') {
+                return res.status(400).json({ error: 'Работа еще не завершена' });
+            }
+
+            if (application.employer_rated) {
+                return res.status(400).json({ error: 'Вы уже оценили этого работодателя' });
+            }
+
+            db.run(
+                'UPDATE users SET rating_sum = rating_sum + ?, total_ratings = total_ratings + 1 WHERE id = ?',
+                [rating, application.employer_id],
+                (err) => {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    db.run(
+                        'UPDATE users SET rating = CAST(rating_sum AS REAL) / total_ratings WHERE id = ?',
+                        [application.employer_id],
+                        (err) => {
+                            if (err) {
+                                return res.status(500).json({ error: 'Ошибка сервера' });
+                            }
+
+                            db.run(
+                                'UPDATE applications SET employer_rated = 1 WHERE id = ?',
+                                [applicationId],
+                                (err) => {
+                                    if (err) {
+                                        return res.status(500).json({ error: 'Ошибка сервера' });
+                                    }
+
+                                    res.json({ message: 'Оценка успешно поставлена!' });
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
+app.post('/api/applications/:applicationId/claim-payment', authenticateToken, (req, res) => {
+    const applicationId = req.params.applicationId;
+
+    db.get(
+        `SELECT a.*, t.payment
+         FROM applications a 
+         JOIN tasks t ON a.task_id = t.id 
+         WHERE a.id = ?`,
+        [applicationId],
+        (err, application) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!application) {
+                return res.status(404).json({ error: 'Отклик не найден' });
+            }
+
+            if (application.worker_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет прав' });
+            }
+
+            if (application.status !== 'completed') {
+                return res.status(400).json({ error: 'Работа еще не завершена' });
+            }
+
+            if (!application.employer_rated) {
+                return res.status(400).json({ error: 'Сначала оцените работодателя' });
+            }
+
+            if (application.payment_claimed) {
+                return res.status(400).json({ error: 'Оплата уже получена' });
+            }
+
+            db.run(
+                'UPDATE users SET balance = balance + ? WHERE id = ?',
+                [application.payment, req.user.id],
+                (err) => {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    db.run(
+                        'UPDATE applications SET payment_claimed = 1 WHERE id = ?',
+                        [applicationId],
+                        (err) => {
+                            if (err) {
+                                return res.status(500).json({ error: 'Ошибка сервера' });
+                            }
+
+                            res.json({ 
+                                message: `Поздравляем! Вы получили ${application.payment} Я баллов (${(application.payment / 10).toFixed(0)} ₽)`,
+                                amount: application.payment
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
+
+// ====================================
+// ЧАТ
+// ====================================
+app.get('/api/chat/:taskId', authenticateToken, (req, res) => {
+    const taskId = req.params.taskId;
+
+    db.get(
+        `SELECT t.employer_id, a.worker_id
+         FROM tasks t
+         LEFT JOIN applications a ON t.id = a.task_id AND a.status = 'accepted'
+         WHERE t.id = ?`,
+        [taskId],
+        (err, access) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!access) {
+                return res.status(404).json({ error: 'Задание не найдено' });
+            }
+
+            if (access.employer_id !== req.user.id && access.worker_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет доступа к чату' });
+            }
+
+            db.all(
+                'SELECT * FROM chat_messages WHERE task_id = ? ORDER BY created_at ASC',
+                [taskId],
+                (err, messages) => {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+                    res.json(messages || []);
+                }
+            );
+        }
+    );
+});
+
+app.post('/api/chat/:taskId', authenticateToken, (req, res) => {
+    const taskId = req.params.taskId;
+    const { text } = req.body;
+
+    if (!text || text.trim().length === 0) {
+        return res.status(400).json({ error: 'Сообщение не может быть пустым' });
+    }
+
+    db.get(
+        `SELECT t.employer_id, a.worker_id
+         FROM tasks t
+         LEFT JOIN applications a ON t.id = a.task_id AND a.status = 'accepted'
+         WHERE t.id = ?`,
+        [taskId],
+        (err, access) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            if (!access) {
+                return res.status(404).json({ error: 'Задание не найдено' });
+            }
+
+            if (access.employer_id !== req.user.id && access.worker_id !== req.user.id) {
+                return res.status(403).json({ error: 'Нет доступа к чату' });
+            }
+
+            db.run(
+                'INSERT INTO chat_messages (task_id, sender_id, sender_name, text) VALUES (?, ?, ?, ?)',
+                [taskId, req.user.id, req.user.username, text.trim()],
+                function(err) {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    res.json({ id: this.lastID, message: 'Сообщение отправлено' });
+                }
+            );
+        }
+    );
+});
+
+// ====================================
+// ПОДДЕРЖКА
+// ====================================
+app.get('/api/support/my-messages', authenticateToken, (req, res) => {
+    db.all(
+        'SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at ASC',
+        [req.user.id],
+        (err, messages) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            res.json(messages || []);
+        }
+    );
+});
+
+app.post('/api/support/send', authenticateToken, (req, res) => {
+    const { text } = req.body;
+
+    if (!text || text.trim().length === 0) {
+        return res.status(400).json({ error: 'Сообщение не может быть пустым' });
+    }
+
+    db.run(
+        'INSERT INTO support_messages (user_id, sender_type, text) VALUES (?, ?, ?)',
+        [req.user.id, 'user', text.trim()],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            res.json({ id: this.lastID, message: 'Сообщение отправлено. Мы ответим в ближайшее время.' });
+        }
+    );
+});
+
+// ====================================
+// БЛАГОТВОРИТЕЛЬНОСТЬ
+// ====================================
+app.post('/api/charity/donate', authenticateToken, (req, res) => {
+    const { amount } = req.body;
+
+    if (amount < 0) {
+        return res.status(400).json({ error: 'Некорректная сумма' });
+    }
+
+    if (amount === 0) {
+        return res.json({ message: 'Спасибо за внимание!' });
+    }
+
+    db.get('SELECT balance FROM users WHERE id = ?', [req.user.id], (err, user) => {
+        if (err) {
+            return res.status(500).json({ error: 'Ошибка сервера' });
+        }
+
+        if (user.balance < amount) {
+            return res.status(400).json({ error: 'Недостаточно средств' });
+        }
+
+        db.run(
+            'UPDATE users SET balance = balance - ? WHERE id = ?',
+            [amount, req.user.id],
+            (err) => {
+                if (err) {
+                    return res.status(500).json({ error: 'Ошибка сервера' });
+                }
+
+                db.run(
+                    'INSERT INTO charity_donations (user_id, amount) VALUES (?, ?)',
+                    [req.user.id, amount],
+                    (err) => {
+                        if (err) {
+                            return res.status(500).json({ error: 'Ошибка сервера' });
+                        }
+
+                        res.json({ 
+                            message: `Спасибо за пожертвование ${amount} Я баллов!`,
+                            newBalance: user.balance - amount
+                        });
+                    }
+                );
+            }
+        );
+    });
+});
+
+// ====================================
+// РЕЙТИНГ
+// ====================================
+app.get('/api/leaderboard', (req, res) => {
+    db.all(
+        `SELECT username, type, rating, total_ratings, completed_tasks
+         FROM users 
+         WHERE total_ratings > 0 
+         ORDER BY rating DESC, total_ratings DESC, completed_tasks DESC
+         LIMIT 100`,
+        [],
+        (err, users) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            res.json(users || []);
+        }
+    );
+});
+
+// ====================================
+// АДМИН-ПАНЕЛЬ
+// ====================================
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        res.json({ success: true });
+    } else {
+        res.json({ success: false });
+    }
+});
+
+app.get('/api/admin/support-tickets', (req, res) => {
+    db.all(
+        `SELECT 
+            sm.user_id,
+            u.username,
+            MAX(sm.created_at) as updated_at,
+            (SELECT text FROM support_messages WHERE user_id = sm.user_id ORDER BY created_at DESC LIMIT 1) as last_message
+         FROM support_messages sm
+         JOIN users u ON sm.user_id = u.id
+         GROUP BY sm.user_id
+         ORDER BY updated_at DESC`,
+        [],
+        (err, tickets) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            res.json(tickets || []);
+        }
+    );
+});
+
+app.get('/api/admin/support-messages/:userId', (req, res) => {
+    const userId = req.params.userId;
+
+    db.all(
+        'SELECT * FROM support_messages WHERE user_id = ? ORDER BY created_at ASC',
+        [userId],
+        (err, messages) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            res.json(messages || []);
+        }
+    );
+});
+
+app.post('/api/admin/support-reply', (req, res) => {
+    const { userId, text } = req.body;
+
+    if (!text || text.trim().length === 0) {
+        return res.status(400).json({ error: 'Сообщение не может быть пустым' });
+    }
+
+    db.run(
+        'INSERT INTO support_messages (user_id, sender_type, text) VALUES (?, ?, ?)',
+        [userId, 'admin', text.trim()],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+
+            res.json({ id: this.lastID, message: 'Ответ отправлен' });
+        }
+    );
+});
 
 // ====================================
 // ГЛАВНАЯ СТРАНИЦА
@@ -621,7 +1306,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Обработка всех остальных маршрутов для SPA
 app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
         res.status(404).json({ error: 'API endpoint not found' });
@@ -675,7 +1359,6 @@ const gracefulShutdown = () => {
         });
     });
 
-    // Принудительное завершение через 10 секунд
     setTimeout(() => {
         console.error('⚠️ Принудительное завершение...');
         process.exit(1);
@@ -685,7 +1368,6 @@ const gracefulShutdown = () => {
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
-// Обработка необработанных исключений
 process.on('uncaughtException', (err) => {
     console.error('❌ Необработанное исключение:', err);
     gracefulShutdown();
