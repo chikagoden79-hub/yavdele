@@ -311,6 +311,7 @@ function TaskPlatform() {
   // Задания и отклики
   const [tasks, setTasks] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
+  const [myTasks, setMyTasks] = useState([]);
   const [taskApplications, setTaskApplications] = useState({});
   const [currentView, setCurrentView] = useState('tasks');
   
@@ -466,6 +467,12 @@ function TaskPlatform() {
       loadMyApplications();
     }
   }, [currentView, token]);
+  useEffect(() => {
+    if (token && user && user.type === 'employer' && currentView === 'myTasks') {
+      loadMyTasks();
+    }
+  }, [currentView, token, user]);
+
 
   // Автообновление чата
   useEffect(() => {
@@ -575,6 +582,22 @@ function TaskPlatform() {
     } catch (err) {
       console.error('Ошибка загрузки откликов:', err);
       setMyApplications([]);
+    }
+  };
+
+  const loadMyTasks = async () => {
+    if (!user || user.type !== 'employer') return;
+    try {
+      const data = await api.getMyTasks(token);
+      if (data.error) {
+        console.error('Ошибка загрузки моих заданий:', data.error);
+        setMyTasks([]);
+      } else {
+        setMyTasks(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки моих заданий:', err);
+      setMyTasks([]);
     }
   };
 
@@ -807,6 +830,9 @@ function TaskPlatform() {
         loadTasks();
         loadProfile();
         loadMyApplications();
+      if (user.type === 'employer') {
+        loadMyTasks();
+      }
       }
     } catch (err) {
       console.error('Ошибка одобрения:', err);
@@ -840,6 +866,9 @@ function TaskPlatform() {
       } else {
         setShowRating({ appId: applicationId, type: 'worker' });
         loadMyApplications();
+      if (user.type === 'employer') {
+        loadMyTasks();
+      }
       }
     } catch (err) {
       console.error('Ошибка подтверждения:', err);
@@ -952,6 +981,10 @@ function TaskPlatform() {
   };
 
   const handleDonate = async () => {
+    if (donateAmount > 0 && donateAmount > user.balance) {
+      alert('❌ Недостаточно средств на балансе');
+      return;
+    }
     try {
       const data = await api.donate(token, donateAmount);
       
@@ -1304,9 +1337,6 @@ function TaskPlatform() {
   // ==================================================================================================
   // ВЫЧИСЛЯЕМ МОИ ЗАДАНИЯ
   // ==================================================================================================
-  
-  const myTasks = tasks.filter(t => t.employer_name === user.username);
-
 
   // ==================================================================================================
   // RENDER - ОСНОВНОЙ ИНТЕРФЕЙС
@@ -1794,8 +1824,16 @@ function TaskPlatform() {
                               )}
                               
                               {app.status === 'completed' && (
-                                <span className="text-green-600 font-semibold">✅ Завершено</span>
-                              )}
+                <div className="flex gap-2 items-center">
+                  <span className="text-green-600 font-semibold">✅ Завершено</span>
+                  <button
+                    onClick={() => setActiveChat(app)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
+                  >
+                    💬 Чат
+                  </button>
+                </div>
+              )}
                             </div>
                           ))}
                         </div>
