@@ -778,6 +778,15 @@ function TaskPlatform() {
   };
 
   const deleteTask = async (taskId) => {
+    // Проверяем что нет принятых откликов
+    const taskApps = taskApplications[taskId] || [];
+    const hasAccepted = taskApps.some(app => app.status === 'accepted' || app.status === 'completed');
+    
+    if (hasAccepted) {
+      alert('❌ Нельзя удалить задание с принятыми откликами!');
+      return;
+    }
+    
     if (!confirm('Удалить задание? Средства будут возвращены на баланс.')) return;
     
     try {
@@ -1138,9 +1147,17 @@ function TaskPlatform() {
             <div className="md:col-span-2 bg-white rounded-lg shadow p-4">
               {adminActiveTicket ? (
                 <>
-                  <h2 className="font-bold text-lg mb-4">
-                    Чат с {adminActiveTicket.username}
-                  </h2>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="font-bold text-lg">
+                      Чат с {adminActiveTicket.username}
+                    </h2>
+                    <button 
+                      onClick={() => setAdminActiveTicket(null)}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm"
+                    >
+                      ✕ Закрыть чат
+                    </button>
+                  </div>
                   
                   <div 
                     ref={adminRef} 
