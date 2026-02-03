@@ -1901,19 +1901,19 @@ function TaskPlatform() {
                     </div>
                   )}
                   
-                  {app.status === 'completed' && !app.worker_rated && (
+                  {app.status === 'completed' && !app.employer_rated && (
                     <button
                       onClick={() => setShowRating({ appId: app.id, type: 'employer' })}
-                      className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition"
+                      className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition font-semibold"
                     >
                       ⭐ Оценить заказчика
                     </button>
                   )}
                   
-                  {app.status === 'completed' && app.worker_rated && !app.payment_claimed && (
+                  {app.status === 'completed' && app.employer_rated && !app.payment_claimed && (
                     <button
                       onClick={() => claimPayment(app.id)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold"
                     >
                       💰 Получить деньги
                     </button>
@@ -2019,15 +2019,22 @@ function TaskPlatform() {
                   <label className="block text-sm font-medium mb-2">
                     ⭐ Минимальный рейтинг исполнителя
                   </label>
-                  <input
-                    type="number"
+                  <select
                     value={newTask.minRating}
-                    onChange={(e) => setNewTask({...newTask, minRating: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => setNewTask({...newTask, minRating: parseFloat(e.target.value)})}
                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                    min="0"
-                    max="5"
-                    step="0.1"
-                  />
+                  >
+                    <option value="0">Без ограничений</option>
+                    <option value="0.5">0.5 ⭐</option>
+                    <option value="1">1.0 ⭐</option>
+                    <option value="1.5">1.5 ⭐</option>
+                    <option value="2">2.0 ⭐</option>
+                    <option value="2.5">2.5 ⭐</option>
+                    <option value="3">3.0 ⭐</option>
+                    <option value="3.5">3.5 ⭐</option>
+                    <option value="4">4.0 ⭐</option>
+                    <option value="4.5">4.5 ⭐</option>
+                  </select>
                   <p className="text-xs text-gray-500 mt-1">Доступно только с ЯвДеле+</p>
                 </div>
               )}
@@ -2215,8 +2222,10 @@ function TaskPlatform() {
               {[1,2,3,4,5].map(rating => (
                 <button
                   key={rating}
+                  type="button"
                   onClick={() => setSelectedRating(rating)}
-                  className={`text-4xl transition ${
+                  onMouseEnter={() => setSelectedRating(rating)}
+                  className={`text-5xl transition-all duration-200 cursor-pointer hover:scale-110 ${
                     rating <= selectedRating ? 'text-yellow-400' : 'text-gray-300'
                   }`}
                 >
@@ -2224,6 +2233,9 @@ function TaskPlatform() {
                 </button>
               ))}
             </div>
+            <p className="text-center text-lg font-bold mb-4">
+              {selectedRating} из 5 звёзд
+            </p>
             
             <div className="flex gap-3">
               <button
