@@ -665,9 +665,10 @@ app.get('/api/tasks/:taskId/applications', authenticateToken, (req, res) => {
         }
 
         db.all(
-            `SELECT a.*, u.username as worker_name, u.rating as worker_rating 
+            `SELECT a.*, u.username as worker_name, u.rating as worker_rating, t.title as task_title
              FROM applications a 
              JOIN users u ON a.worker_id = u.id 
+             JOIN tasks t ON a.task_id = t.id
              WHERE a.task_id = ?
              ORDER BY a.created_at DESC`,
             [taskId],
