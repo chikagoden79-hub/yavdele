@@ -1054,7 +1054,7 @@ app.get('/api/chat/:taskId', authenticateToken, (req, res) => {
     db.get(
         `SELECT t.employer_id, a.worker_id
          FROM tasks t
-         LEFT JOIN applications a ON t.id = a.task_id AND a.status = 'accepted'
+         LEFT JOIN applications a ON t.id = a.task_id AND (a.status = 'accepted' OR a.status = 'completed')
          WHERE t.id = ?`,
         [taskId],
         (err, access) => {
@@ -1095,7 +1095,7 @@ app.post('/api/chat/:taskId', authenticateToken, (req, res) => {
     db.get(
         `SELECT t.employer_id, a.worker_id
          FROM tasks t
-         LEFT JOIN applications a ON t.id = a.task_id AND a.status = 'accepted'
+         LEFT JOIN applications a ON t.id = a.task_id AND (a.status = 'accepted' OR a.status = 'completed')
          WHERE t.id = ?`,
         [taskId],
         (err, access) => {
