@@ -1016,6 +1016,8 @@ function TaskPlatform() {
   const sendMsg = async () => {
     if (!msgInput.trim() || !activeChat) return;
     
+    console.log('Отправка сообщения в чат, taskId:', activeChat.task_id);
+    
     try {
       await api.sendMessage(token, activeChat.task_id, msgInput);
       setMsgInput('');
@@ -1027,6 +1029,8 @@ function TaskPlatform() {
 
   const sendSupportMsg = async () => {
     if (!supportInput.trim()) return;
+    
+    console.log('Отправка сообщения в поддержку:', supportInput);
     
     try {
       await api.sendSupport(token, supportInput);
