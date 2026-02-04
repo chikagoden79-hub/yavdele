@@ -1053,6 +1053,22 @@ function TaskPlatform() {
     }
   };
 
+  const closeAdminChat = async () => {
+    if (!adminActiveTicket) return;
+    
+    if (!confirm('Завершить диалог? Пользователь увидит сообщение "Чат завершён".')) return;
+    
+    try {
+      await api.adminReply(adminActiveTicket.user_id, '--- ЧАТ ЗАВЕРШЁН ---');
+      alert('✅ Чат завершён');
+      setAdminActiveTicket(null);
+      loadAdminTickets();
+    } catch (err) {
+      console.error('Ошибка закрытия чата:', err);
+      alert('❌ Ошибка закрытия чата');
+    }
+  };
+
 
   // ==================================================================================================
   // RENDER - ЭКРАН СОГЛАСИЯ С ДОГОВОРОМ
@@ -1156,7 +1172,7 @@ function TaskPlatform() {
                       Чат с {adminActiveTicket.username}
                     </h2>
                     <button 
-                      onClick={() => setAdminActiveTicket(null)}
+                      onClick={() => closeAdminChat()}
                       className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm"
                     >
                       ✕ Закрыть чат
