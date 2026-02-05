@@ -1149,19 +1149,71 @@ app.post('/api/support/send', authenticateToken, (req, res) => {
         return res.status(400).json({ error: 'Сообщение не может быть пустым' });
     }
 
-    db.run(
-        'INSERT INTO support_messages (user_id, sender_type, text) VALUES (?, ?, ?)',
-        [req.user.id, 'user', text.trim()],
-        function(err) {
+    // Проверяем, первое ли это сообщение от пользователя
+    db.get(
+        'SELECT COUNT(*) as count FROM support_messages WHERE user_id = ?',
+        [req.user.id],
+        (err, result) => {
             if (err) {
                 return res.status(500).json({ error: 'Ошибка сервера' });
             }
 
-            res.json({ id: this.lastID, message: 'Сообщение отправлено. Мы ответим в ближайшее время.' });
+            const isFirstMessage = result.count === 0;
+
+            db.run(
+                'INSERT INTO support_messages (user_id, sender_type, text) VALUES (?, ?, ?)',
+                [req.user.id, 'user', text.trim()],
+                function(err) {
+                    if (err) {
+                        return res.status(500).json({ error: 'Ошибка сервера' });
+                    }
+
+                    // Если первое сообщение - автоматически отвечаем
+                    if (isFirstMessage) {
+                        db.run(
+                            'INSERT INTO support_messages (user_id, sender_type, text) VALUES (?, ?, ?)',
+                            [req.user.id, 'admin', 'Здравствуйте. Сейчас всё уточню и вернусь!'],
+                            (err) => {
+                                if (err) {
+                                    console.error('Ошибка автоответа:', err);
+                                }
+                            }
+                        );
+                    }
+
+                    res.json({ id: this.lastID, message: 'Сообщение отправлено. Мы ответим в ближайшее время.' });
+                }
+            );
         }
     );
 });
 
+
+// Закрытие чата администратором
+app.post('/api/admin/close-chat', (req, res) => {
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'userId обязателен' });
+    }
+
+    // Отправляем финальное сообщение пользователю
+    db.run(
+        'INSERT INTO support_messages (user_id, sender_type, text) VALUES (?, ?, ?)',
+        [userId, 'admin', '--- ЧАТ ЗАВЕРШЁН ---'],
+        (err) => {
+            if (err) {
+                return res.status(500).json({ error: 'Ошибка отправки сообщения' });
+            }
+
+            // Удаляем все сообщения этого чата ДЛЯ АДМИНА
+            // (для пользователя они остаются, включая "ЧАТ ЗАВЕРШЁН")
+            // Можно добавить флаг "closed" вместо удаления, если нужна история
+            
+            res.json({ message: 'Чат закрыт и удалён из списка' });
+        }
+    );
+});
 // ====================================
 // БЛАГОТВОРИТЕЛЬНОСТЬ
 // ====================================
