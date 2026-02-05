@@ -1219,7 +1219,7 @@ app.get('/api/leaderboard', (req, res) => {
     db.all(
         `SELECT username, type, rating, total_ratings, completed_tasks
          FROM users 
-         WHERE total_ratings > 0 
+         WHERE total_ratings > 0 AND type = 'worker'
          ORDER BY rating DESC, total_ratings DESC, completed_tasks DESC
          LIMIT 100`,
         [],
