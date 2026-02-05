@@ -1056,11 +1056,11 @@ function TaskPlatform() {
   const closeAdminChat = async () => {
     if (!adminActiveTicket) return;
     
-    if (!confirm('Завершить диалог? Пользователь увидит сообщение "Чат завершён".')) return;
+    if (!confirm('Завершить и удалить диалог? Пользователь увидит "ЧАТ ЗАВЕРШЁН", а у вас чат исчезнет из списка.')) return;
     
     try {
-      await api.adminReply(adminActiveTicket.user_id, '--- ЧАТ ЗАВЕРШЁН ---');
-      alert('✅ Чат завершён');
+      await api.closeAdminChat(adminActiveTicket.user_id);
+      alert('✅ Чат завершён и удалён');
       setAdminActiveTicket(null);
       loadAdminTickets();
     } catch (err) {
