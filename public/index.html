@@ -311,6 +311,7 @@ function TaskPlatform() {
   // Задания и отклики
   const [tasks, setTasks] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
+  const [myTasks, setMyTasks] = useState([]);
   const [taskApplications, setTaskApplications] = useState({});
   const [currentView, setCurrentView] = useState('tasks');
   
@@ -466,6 +467,12 @@ function TaskPlatform() {
       loadMyApplications();
     }
   }, [currentView, token]);
+  useEffect(() => {
+    if (token && user && user.type === 'employer' && currentView === 'myTasks') {
+      loadMyTasks();
+    }
+  }, [currentView, token, user]);
+
 
   // Автообновление чата
   useEffect(() => {
@@ -575,6 +582,22 @@ function TaskPlatform() {
     } catch (err) {
       console.error('Ошибка загрузки откликов:', err);
       setMyApplications([]);
+    }
+  };
+
+  const loadMyTasks = async () => {
+    if (!user || user.type !== 'employer') return;
+    try {
+      const data = await api.getMyTasks(token);
+      if (data.error) {
+        console.error('Ошибка загрузки моих заданий:', data.error);
+        setMyTasks([]);
+      } else {
+        setMyTasks(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки моих заданий:', err);
+      setMyTasks([]);
     }
   };
 
@@ -755,6 +778,15 @@ function TaskPlatform() {
   };
 
   const deleteTask = async (taskId) => {
+    // Проверяем что нет принятых откликов
+    const taskApps = taskApplications[taskId] || [];
+    const hasAccepted = taskApps.some(app => app.status === 'accepted' || app.status === 'completed');
+    
+    if (hasAccepted) {
+      alert('❌ Нельзя удалить задание с принятыми откликами!');
+      return;
+    }
+    
     if (!confirm('Удалить задание? Средства будут возвращены на баланс.')) return;
     
     try {
@@ -807,6 +839,9 @@ function TaskPlatform() {
         loadTasks();
         loadProfile();
         loadMyApplications();
+      if (user.type === 'employer') {
+        loadMyTasks();
+      }
       }
     } catch (err) {
       console.error('Ошибка одобрения:', err);
@@ -840,6 +875,9 @@ function TaskPlatform() {
       } else {
         setShowRating({ appId: applicationId, type: 'worker' });
         loadMyApplications();
+      if (user.type === 'employer') {
+        loadMyTasks();
+      }
       }
     } catch (err) {
       console.error('Ошибка подтверждения:', err);
@@ -952,6 +990,10 @@ function TaskPlatform() {
   };
 
   const handleDonate = async () => {
+    if (donateAmount > 0 && donateAmount > user.balance) {
+      alert('❌ Недостаточно средств на балансе');
+      return;
+    }
     try {
       const data = await api.donate(token, donateAmount);
       
@@ -974,6 +1016,8 @@ function TaskPlatform() {
   const sendMsg = async () => {
     if (!msgInput.trim() || !activeChat) return;
     
+    console.log('Отправка сообщения в чат, taskId:', activeChat.task_id);
+    
     try {
       await api.sendMessage(token, activeChat.task_id, msgInput);
       setMsgInput('');
@@ -985,6 +1029,8 @@ function TaskPlatform() {
 
   const sendSupportMsg = async () => {
     if (!supportInput.trim()) return;
+    
+    console.log('Отправка сообщения в поддержку:', supportInput);
     
     try {
       await api.sendSupport(token, supportInput);
@@ -1004,6 +1050,22 @@ function TaskPlatform() {
       loadAdminMessages();
     } catch (err) {
       console.error('Ошибка отправки ответа:', err);
+    }
+  };
+
+  const closeAdminChat = async () => {
+    if (!adminActiveTicket) return;
+    
+    if (!confirm('Завершить и удалить диалог? Пользователь увидит "ЧАТ ЗАВЕРШЁН", а у вас чат исчезнет из списка.')) return;
+    
+    try {
+      await api.closeAdminChat(adminActiveTicket.user_id);
+      alert('✅ Чат завершён и удалён');
+      setAdminActiveTicket(null);
+      loadAdminTickets();
+    } catch (err) {
+      console.error('Ошибка закрытия чата:', err);
+      alert('❌ Ошибка закрытия чата');
     }
   };
 
@@ -1105,9 +1167,17 @@ function TaskPlatform() {
             <div className="md:col-span-2 bg-white rounded-lg shadow p-4">
               {adminActiveTicket ? (
                 <>
-                  <h2 className="font-bold text-lg mb-4">
-                    Чат с {adminActiveTicket.username}
-                  </h2>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="font-bold text-lg">
+                      Чат с {adminActiveTicket.username}
+                    </h2>
+                    <button 
+                      onClick={() => closeAdminChat()}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm"
+                    >
+                      ✕ Закрыть чат
+                    </button>
+                  </div>
                   
                   <div 
                     ref={adminRef} 
@@ -1304,9 +1374,6 @@ function TaskPlatform() {
   // ==================================================================================================
   // ВЫЧИСЛЯЕМ МОИ ЗАДАНИЯ
   // ==================================================================================================
-  
-  const myTasks = tasks.filter(t => t.employer_name === user.username);
-
 
   // ==================================================================================================
   // RENDER - ОСНОВНОЙ ИНТЕРФЕЙС
@@ -1794,8 +1861,16 @@ function TaskPlatform() {
                               )}
                               
                               {app.status === 'completed' && (
-                                <span className="text-green-600 font-semibold">✅ Завершено</span>
-                              )}
+                <div className="flex gap-2 items-center">
+                  <span className="text-green-600 font-semibold">✅ Завершено</span>
+                  <button
+                    onClick={() => setActiveChat(app)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
+                  >
+                    💬 Чат
+                  </button>
+                </div>
+              )}
                             </div>
                           ))}
                         </div>
@@ -1863,19 +1938,19 @@ function TaskPlatform() {
                     </div>
                   )}
                   
-                  {app.status === 'completed' && !app.worker_rated && (
+                  {app.status === 'completed' && !app.employer_rated && (
                     <button
                       onClick={() => setShowRating({ appId: app.id, type: 'employer' })}
-                      className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition"
+                      className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition font-semibold"
                     >
                       ⭐ Оценить заказчика
                     </button>
                   )}
                   
-                  {app.status === 'completed' && app.worker_rated && !app.payment_claimed && (
+                  {app.status === 'completed' && app.employer_rated && !app.payment_claimed && (
                     <button
                       onClick={() => claimPayment(app.id)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold"
                     >
                       💰 Получить деньги
                     </button>
@@ -1981,15 +2056,22 @@ function TaskPlatform() {
                   <label className="block text-sm font-medium mb-2">
                     ⭐ Минимальный рейтинг исполнителя
                   </label>
-                  <input
-                    type="number"
+                  <select
                     value={newTask.minRating}
-                    onChange={(e) => setNewTask({...newTask, minRating: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => setNewTask({...newTask, minRating: parseFloat(e.target.value)})}
                     className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                    min="0"
-                    max="5"
-                    step="0.1"
-                  />
+                  >
+                    <option value="0">Без ограничений</option>
+                    <option value="0.5">0.5 ⭐</option>
+                    <option value="1">1.0 ⭐</option>
+                    <option value="1.5">1.5 ⭐</option>
+                    <option value="2">2.0 ⭐</option>
+                    <option value="2.5">2.5 ⭐</option>
+                    <option value="3">3.0 ⭐</option>
+                    <option value="3.5">3.5 ⭐</option>
+                    <option value="4">4.0 ⭐</option>
+                    <option value="4.5">4.5 ⭐</option>
+                  </select>
                   <p className="text-xs text-gray-500 mt-1">Доступно только с ЯвДеле+</p>
                 </div>
               )}
@@ -2177,8 +2259,10 @@ function TaskPlatform() {
               {[1,2,3,4,5].map(rating => (
                 <button
                   key={rating}
+                  type="button"
                   onClick={() => setSelectedRating(rating)}
-                  className={`text-4xl transition ${
+                  onMouseEnter={() => setSelectedRating(rating)}
+                  className={`text-5xl transition-all duration-200 cursor-pointer hover:scale-110 ${
                     rating <= selectedRating ? 'text-yellow-400' : 'text-gray-300'
                   }`}
                 >
@@ -2186,6 +2270,9 @@ function TaskPlatform() {
                 </button>
               ))}
             </div>
+            <p className="text-center text-lg font-bold mb-4">
+              {selectedRating} из 5 звёзд
+            </p>
             
             <div className="flex gap-3">
               <button
