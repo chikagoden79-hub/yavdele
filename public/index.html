@@ -362,6 +362,9 @@ function TaskPlatform() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminTickets, setAdminTickets] = useState([]);
   const [adminActiveTicket, setAdminActiveTicket] = useState(null);
+  const [adminSection, setAdminSection] = useState('support'); // 'support' или 'tasks'
+  const [allTasks, setAllTasks] = useState([]);
+  const [acceptedApplications, setAcceptedApplications] = useState([]);
   const [adminMessages, setAdminMessages] = useState([]);
   const [adminInput, setAdminInput] = useState('');
 
@@ -664,6 +667,30 @@ function TaskPlatform() {
       }
     } catch (err) {
       console.error('Ошибка загрузки тикетов:', err);
+    }
+  };
+
+  const loadAllTasks = async () => {
+    try {
+      const tasks = await api.getAllTasks();
+      setAllTasks(tasks);
+    } catch (err) {
+      console.error('Ошибка загрузки заданий:', err);
+    }
+  };
+
+  const deleteTaskAdmin = async (taskId, title) => {
+    if (!confirm(`Удалить задание "${title}"?`)) return;
+    
+    if (!confirm('⚠️ ПОДТВЕРДИТЕ: Я баллы НЕ будут возвращены работодателю! Это наказание за нарушение правил.')) return;
+    
+    try {
+      await api.deleteTask(taskId);
+      alert('✅ Задание удалено. Я баллы НЕ возвращены.');
+      loadAllTasks();
+    } catch (err) {
+      console.error('Ошибка удаления:', err);
+      alert('❌ Ошибка удаления задания');
     }
   };
 
@@ -1165,6 +1192,10 @@ function TaskPlatform() {
             </div>
 
             <div className="md:col-span-2 bg-white rounded-lg shadow p-4">
+                {/* РАЗДЕЛ ПОДДЕРЖКИ */}
+                {adminSection === 'support' && (
+                  <div>
+
               {adminActiveTicket ? (
                 <>
                   <div className="flex justify-between items-center mb-4">
